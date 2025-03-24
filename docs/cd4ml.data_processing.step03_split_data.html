@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Python: module cd4ml.data_processing.step03_split_data</title>
+</head><body>
+
+<table class="heading">
+<tr class="heading-text decor">
+<td class="title">&nbsp;<br><strong class="title"><a href="cd4ml.html" class="white">cd4ml</a>.<a href="cd4ml.data_processing.html" class="white">data_processing</a>.step03_split_data</strong></td>
+<td class="extra"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Cisabell%20gurstein%5Cmle_rakuten%5Cmlops-rakuten-project%5Cplugins%5Ccd4ml%5Cdata_processing%5Cstep03_split_data.py">c:\users\isabell gurstein\mle_rakuten\mlops-rakuten-project\plugins\cd4ml\data_processing\step03_split_data.py</a></td></tr></table>
+    <p><span class="code">#&nbsp;module&nbsp;for&nbsp;splitting&nbsp;data&nbsp;into&nbsp;training&nbsp;and&nbsp;test&nbsp;sets</span></p>
+<p>
+<table class="section">
+<tr class="decor pkg-content-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
+    
+<tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="pandas.html">pandas</a><br>
+</td><td class="multicolumn"></td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+<table class="section">
+<tr class="decor functions-decor heading-text">
+<td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
+    
+<tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
+<td class="singlecolumn"><dl><dt><a name="-split_dataset"><strong>split_dataset</strong></a>(df: pandas.core.frame.DataFrame, target_column: str, test_size: float = 0.2, random_state: int = 42)</dt><dd><span class="code">Splits&nbsp;a&nbsp;DataFrame&nbsp;into&nbsp;training&nbsp;and&nbsp;test&nbsp;sets&nbsp;using&nbsp;scikit-learn.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;df&nbsp;(pd.DataFrame):&nbsp;Input&nbsp;DataFrame&nbsp;containing&nbsp;features&nbsp;and&nbsp;label.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target_column&nbsp;(str):&nbsp;Name&nbsp;of&nbsp;the&nbsp;label&nbsp;column.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;test_size&nbsp;(float):&nbsp;Proportion&nbsp;of&nbsp;test&nbsp;data.&nbsp;Defaults&nbsp;to&nbsp;0.2.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;random_state&nbsp;(int):&nbsp;Random&nbsp;seed&nbsp;for&nbsp;reproducibility.&nbsp;Defaults&nbsp;to&nbsp;42.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;tuple:&nbsp;X_train,&nbsp;X_test,&nbsp;y_train,&nbsp;y_test</span></dd></dl>
+</td></tr></table>
+</body></html>
