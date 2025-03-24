@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 current_dir = Path(__file__).resolve().parent
-project_root = current_dir.parents[2] # parents[2] is the root of the project
+project_root = current_dir.parents[2]  # 3 levels up to get to the project root
 plugins_path = project_root / "plugins"
 docs_path = project_root / "docs"
 
