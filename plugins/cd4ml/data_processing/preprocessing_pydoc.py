@@ -1,34 +1,46 @@
 import os
+import sys
 import subprocess
 from pathlib import Path
 
-# Locate directories
 current_dir = Path(__file__).resolve().parent
-project_root = current_dir.parents[2]
-output_dir = current_dir / "docs"
+project_root = current_dir.parents[2] # parents[2] is the root of the project
+plugins_path = project_root / "plugins"
+docs_path = project_root / "docs"
 
-# Base module path for pydoc
-base_module_path = "plugins.cd4ml.data_processing"
+env = os.environ.copy()
+env["PYTHONPATH"] = str(plugins_path)
 
-# Make sure output folder exists
-output_dir.mkdir(exist_ok=True)
+modules = [
+    "cd4ml.data_processing.step01_combine_xy",
+    "cd4ml.data_processing.step02_text_cleaning",
+    "cd4ml.data_processing.step03_split_data",
+    "cd4ml.data_processing.step04_tfidf_transform"
+]
 
-# Generate docs
-for file in current_dir.glob("step*.py"):
-    module_name = file.stem
-    full_module = f"{base_module_path}.{module_name}"
-    print(f"Generating documentation for: {full_module}")
-    subprocess.run(
-        ["python", "-m", "pydoc", "-w", full_module],
-        cwd=project_root,  # this makes sure pydoc sees your modules
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+docs_path.mkdir(exist_ok=True)
+
+for module in modules:
+    print(f"Generating doc for: {module}")
+    result = subprocess.run(
+        [sys.executable, "-m", "pydoc", "-w", module],
+        cwd=project_root,
+        env=env,
+        capture_output=True,
+        text=True
     )
+    if result.returncode != 0:
+        print(f"Failed to generate doc for {module}")
+        print(result.stderr)
+    else:
+        print(result.stdout)
 
-# Move generated .html files from root to docs/
+# Move HTML files
 for html_file in project_root.glob("*.html"):
     if "data_processing" in html_file.name:
-        target = output_dir / html_file.name
-        html_file.rename(target)
-
-print("Documentation files saved in the 'docs/' folder.")
+        target = docs_path / html_file.name
+        if target.exists():
+            print(f"Skipping move: {html_file.name} already exists in docs/")
+        else:
+            html_file.rename(target)
+            print(f"Moved {html_file.name} /docs")
