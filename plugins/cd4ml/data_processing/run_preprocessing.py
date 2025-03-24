@@ -1,7 +1,9 @@
 import sys
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+sys.path.append(os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "../../")))
+
 
 from cd4ml.data_processing import (
     load_combined_data,
@@ -10,21 +12,23 @@ from cd4ml.data_processing import (
     apply_tfidf
 )
 
+
 def main():
     # 1. Load combined data
     df = load_combined_data("../../../data/raw/raw_x_y.csv")
 
     # 2. Clean text
     if "description" not in df.columns:
-        raise KeyError("'description' not found.")
+        raise KeyError("description not found.")
     df["cleaned_text"] = df["description"].astype(str).apply(clean_text)
 
     # 3. Train/Test-Split
     if "prdtypecode" not in df.columns:
-        raise KeyError("'prdtypecode' not found.")
-    X_train, X_test, y_train, y_test = split_dataset(df, target_column="prdtypecode")
+        raise KeyError("prdtypecode not found.")
+    X_train, X_test, y_train, y_test = split_dataset(
+        df, target_column="prdtypecode")
 
-    # 4. TF-IDF
+    # 4. TF-IDF Transformation
     X_train_tfidf, vectorizer = apply_tfidf(X_train["cleaned_text"])
 
     # 5. Save outputs
@@ -39,6 +43,7 @@ def main():
     print(f"TF-IDF Shape: {X_train_tfidf.shape}")
     print(f"Labels: {y_train.shape}")
     print(f"Vocabulary size: {len(vectorizer.vocabulary_)}")
+
 
 if __name__ == "__main__":
     main()

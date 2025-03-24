@@ -15,7 +15,8 @@ modules = [
     "cd4ml.data_processing.step01_combine_xy",
     "cd4ml.data_processing.step02_text_cleaning",
     "cd4ml.data_processing.step03_split_data",
-    "cd4ml.data_processing.step04_tfidf_transform"
+    "cd4ml.data_processing.step04_tfidf_transform",
+    "cd4ml.data_processing.run_preprocessing"
 ]
 
 docs_path.mkdir(exist_ok=True)
