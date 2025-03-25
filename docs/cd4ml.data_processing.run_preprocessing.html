@@ -9,7 +9,39 @@
 <tr class="heading-text decor">
 <td class="title">&nbsp;<br><strong class="title"><a href="cd4ml.html" class="white">cd4ml</a>.<a href="cd4ml.data_processing.html" class="white">data_processing</a>.run_preprocessing</strong></td>
 <td class="extra"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Cisabell%20gurstein%5Cmle_rakuten%5Cmlops-rakuten-project%5Cplugins%5Ccd4ml%5Cdata_processing%5Crun_preprocessing.py">c:\users\isabell gurstein\mle_rakuten\mlops-rakuten-project\plugins\cd4ml\data_processing\run_preprocessing.py</a></td></tr></table>
-    <p></p>
+    <p><span class="code">run_preprocessing.py<br>
+&nbsp;<br>
+This&nbsp;script&nbsp;orchestrates&nbsp;the&nbsp;full&nbsp;data&nbsp;preprocessing&nbsp;pipeline&nbsp;for&nbsp;our&nbsp;machine&nbsp;learning&nbsp;project.<br>
+It&nbsp;performs&nbsp;the&nbsp;following&nbsp;steps:<br>
+&nbsp;<br>
+1.&nbsp;Data&nbsp;Loading&nbsp;and&nbsp;Combining:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Loads&nbsp;feature&nbsp;and&nbsp;label&nbsp;data&nbsp;from&nbsp;two&nbsp;separate&nbsp;CSV&nbsp;files&nbsp;using&nbsp;the&nbsp;function&nbsp;`load_combined_data`.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Combines&nbsp;these&nbsp;datasets&nbsp;into&nbsp;a&nbsp;single&nbsp;DataFrame&nbsp;and&nbsp;optionally&nbsp;saves&nbsp;the&nbsp;combined&nbsp;raw&nbsp;data&nbsp;as&nbsp;a&nbsp;CSV.<br>
+&nbsp;<br>
+2.&nbsp;Text&nbsp;Cleaning:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Applies&nbsp;a&nbsp;custom&nbsp;text&nbsp;cleaning&nbsp;function&nbsp;`clean_text`&nbsp;to&nbsp;the&nbsp;"description"&nbsp;column.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;The&nbsp;cleaning&nbsp;function&nbsp;removes&nbsp;special&nbsp;characters&nbsp;(keeping&nbsp;letters,&nbsp;numbers,&nbsp;and&nbsp;spaces),&nbsp;converts&nbsp;text&nbsp;to&nbsp;lowercase,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tokenizes,&nbsp;lemmatizes,&nbsp;and&nbsp;removes&nbsp;stopwords&nbsp;(from&nbsp;English,&nbsp;French,&nbsp;and&nbsp;custom-defined&nbsp;lists).<br>
+&nbsp;<br>
+3.&nbsp;Data&nbsp;Splitting:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Splits&nbsp;the&nbsp;combined&nbsp;DataFrame&nbsp;into&nbsp;training,&nbsp;validation,&nbsp;and&nbsp;test&nbsp;sets&nbsp;using&nbsp;the&nbsp;function&nbsp;`split_dataset`.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;The&nbsp;splitting&nbsp;is&nbsp;stratified&nbsp;based&nbsp;on&nbsp;the&nbsp;target&nbsp;column&nbsp;"prdtypecode"&nbsp;to&nbsp;preserve&nbsp;class&nbsp;distributions.<br>
+&nbsp;<br>
+4.&nbsp;TF-IDF&nbsp;Vectorization:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Loads&nbsp;the&nbsp;cleaned&nbsp;text&nbsp;from&nbsp;the&nbsp;training,&nbsp;validation,&nbsp;and&nbsp;test&nbsp;sets.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Applies&nbsp;TF-IDF&nbsp;vectorization&nbsp;with&nbsp;custom&nbsp;parameters&nbsp;(ngram_range,&nbsp;max_df,&nbsp;min_df,&nbsp;max_features)&nbsp;via&nbsp;`apply_tfidf`.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;The&nbsp;vectorizer&nbsp;is&nbsp;fitted&nbsp;on&nbsp;the&nbsp;training&nbsp;data&nbsp;and&nbsp;then&nbsp;used&nbsp;to&nbsp;transform&nbsp;the&nbsp;validation&nbsp;and&nbsp;test&nbsp;data.<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Optionally,&nbsp;the&nbsp;TF-IDF&nbsp;matrices&nbsp;are&nbsp;saved&nbsp;as&nbsp;pickle&nbsp;files.<br>
+&nbsp;<br>
+5.&nbsp;Saving&nbsp;Processed&nbsp;Data:<br>
+&nbsp;&nbsp;&nbsp;-&nbsp;Saves&nbsp;the&nbsp;training,&nbsp;validation,&nbsp;and&nbsp;test&nbsp;sets&nbsp;(both&nbsp;features&nbsp;and&nbsp;targets)&nbsp;as&nbsp;CSV&nbsp;files&nbsp;in&nbsp;the&nbsp;processed&nbsp;data&nbsp;directory.<br>
+&nbsp;<br>
+Usage:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;To&nbsp;run&nbsp;the&nbsp;preprocessing&nbsp;pipeline,&nbsp;execute&nbsp;this&nbsp;script&nbsp;from&nbsp;the&nbsp;command&nbsp;line:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;python&nbsp;run_preprocessing.py<br>
+&nbsp;<br>
+All&nbsp;steps&nbsp;are&nbsp;executed&nbsp;in&nbsp;sequence,&nbsp;ensuring&nbsp;that&nbsp;the&nbsp;raw&nbsp;data&nbsp;is&nbsp;processed&nbsp;and&nbsp;saved&nbsp;for&nbsp;further&nbsp;modeling&nbsp;tasks.</span></p>
 <p>
 <table class="section">
 <tr class="decor pkg-content-decor heading-text">
@@ -17,8 +49,9 @@
     
 <tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
 <td class="singlecolumn"><table><tr><td class="multicolumn"><a href="os.html">os</a><br>
+</td><td class="multicolumn"><a href="pandas.html">pandas</a><br>
 </td><td class="multicolumn"><a href="sys.html">sys</a><br>
-</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
 <table class="section">
 <tr class="decor functions-decor heading-text">
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>

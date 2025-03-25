@@ -9,7 +9,7 @@
 <tr class="heading-text decor">
 <td class="title">&nbsp;<br><strong class="title"><a href="cd4ml.html" class="white">cd4ml</a>.<a href="cd4ml.data_processing.html" class="white">data_processing</a>.step01_combine_xy</strong></td>
 <td class="extra"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Cisabell%20gurstein%5Cmle_rakuten%5Cmlops-rakuten-project%5Cplugins%5Ccd4ml%5Cdata_processing%5Cstep01_combine_xy.py">c:\users\isabell gurstein\mle_rakuten\mlops-rakuten-project\plugins\cd4ml\data_processing\step01_combine_xy.py</a></td></tr></table>
-    <p><span class="code">#&nbsp;the&nbsp;module&nbsp;contains&nbsp;function&nbsp;units&nbsp;for&nbsp;combining&nbsp;features&nbsp;and&nbsp;labels&nbsp;into&nbsp;a&nbsp;single&nbsp;DataFrame</span></p>
+    <p></p>
 <p>
 <table class="section">
 <tr class="decor pkg-content-decor heading-text">
@@ -23,12 +23,13 @@
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
     
 <tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><dl><dt><a name="-load_combined_data"><strong>load_combined_data</strong></a>(csv_path: str) -&gt; pandas.core.frame.DataFrame</dt><dd><span class="code">Loads&nbsp;feature&nbsp;data&nbsp;(X)&nbsp;and&nbsp;label&nbsp;data&nbsp;(y)&nbsp;from&nbsp;CSV&nbsp;files<br>
-and&nbsp;combines&nbsp;them&nbsp;into&nbsp;a&nbsp;single&nbsp;DataFrame.<br>
+<td class="singlecolumn"><dl><dt><a name="-load_combined_data"><strong>load_combined_data</strong></a>(x_path: str, y_path: str, save_path: str = None) -&gt; pandas.core.frame.DataFrame</dt><dd><span class="code">Loads&nbsp;feature&nbsp;and&nbsp;target&nbsp;data&nbsp;from&nbsp;separate&nbsp;CSV&nbsp;files,&nbsp;combines&nbsp;them&nbsp;into&nbsp;a&nbsp;single&nbsp;DataFrame,<br>
+converts&nbsp;the&nbsp;target&nbsp;data&nbsp;to&nbsp;string,&nbsp;and&nbsp;optionally&nbsp;saves&nbsp;the&nbsp;combined&nbsp;DataFrame&nbsp;to&nbsp;a&nbsp;CSV&nbsp;file.<br>
 &nbsp;<br>
 Args:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;x_path&nbsp;(str):&nbsp;Path&nbsp;to&nbsp;the&nbsp;CSV&nbsp;file&nbsp;containing&nbsp;features.<br>
-&nbsp;&nbsp;&nbsp;&nbsp;y_path&nbsp;(str):&nbsp;Path&nbsp;to&nbsp;the&nbsp;CSV&nbsp;file&nbsp;containing&nbsp;labels.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;y_path&nbsp;(str):&nbsp;Path&nbsp;to&nbsp;the&nbsp;CSV&nbsp;file&nbsp;containing&nbsp;target&nbsp;labels.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;save_path&nbsp;(str,&nbsp;optional):&nbsp;If&nbsp;provided,&nbsp;the&nbsp;path&nbsp;where&nbsp;the&nbsp;combined&nbsp;DataFrame&nbsp;will&nbsp;be&nbsp;saved.<br>
 &nbsp;<br>
 Returns:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;pd.DataFrame:&nbsp;Combined&nbsp;DataFrame&nbsp;with&nbsp;features&nbsp;and&nbsp;target.</span></dd></dl>
