@@ -1,18 +1,20 @@
-# data_processing/Dockerfile
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# copy requirements.txt
-# install dependencies
+# Systempakete installieren
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# Pip upgraden + NumPy
+RUN pip install --no-cache-dir --upgrade pip numpy==1.23.5
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# copy all files
 COPY . .
+RUN python -c "import nltk; nltk.download('punkt'); nltk.download('stopwords'); nltk.download('wordnet')"
 
-# NLTK-Downloads, if needed
-RUN python -m nltk.downloader punkt stopwords wordnet
-
-# run the preprocessing script
 CMD ["python", "run_preprocessing.py"]
