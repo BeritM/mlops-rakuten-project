@@ -43,7 +43,7 @@ app = FastAPI()
 # Load model and vectorizer
 predictor = ProductTypePredictor(
     vectorizer_path="models/tfidf_vectorizer.pkl",
-    model_path="models/sgd_classifier.pkl"
+    model_path="models/sgd_text_model.pkl"
 )
 
 # --- Request Body Schema ---
