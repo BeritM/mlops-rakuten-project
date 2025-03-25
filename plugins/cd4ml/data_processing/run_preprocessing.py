@@ -4,12 +4,14 @@ import os
 sys.path.append(os.path.abspath(os.path.join(
     os.path.dirname(__file__), "../../")))
 
+
 from cd4ml.data_processing import (
     load_combined_data,
     clean_text,
     split_dataset,
     apply_tfidf
 )
+
 
 def main():
     # 1. Load combined data from separate CSV files and combine them
@@ -50,6 +52,7 @@ def main():
     print(f"Validation Labels: {y_validate.shape}")
     print(f"Test Labels: {y_test.shape}")
     print(f"Vocabulary size: {len(vectorizer.vocabulary_)}")
+
 
 if __name__ == "__main__":
     main()
