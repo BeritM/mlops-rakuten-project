@@ -9,7 +9,7 @@
 <tr class="heading-text decor">
 <td class="title">&nbsp;<br><strong class="title"><a href="cd4ml.html" class="white">cd4ml</a>.<a href="cd4ml.data_processing.html" class="white">data_processing</a>.step02_text_cleaning</strong></td>
 <td class="extra"><a href=".">index</a><br><a href="file:c%3A%5Cusers%5Cisabell%20gurstein%5Cmle_rakuten%5Cmlops-rakuten-project%5Cplugins%5Ccd4ml%5Cdata_processing%5Cstep02_text_cleaning.py">c:\users\isabell gurstein\mle_rakuten\mlops-rakuten-project\plugins\cd4ml\data_processing\step02_text_cleaning.py</a></td></tr></table>
-    <p><span class="code">#&nbsp;module&nbsp;for&nbsp;text&nbsp;cleaning</span></p>
+    <p></p>
 <p>
 <table class="section">
 <tr class="decor pkg-content-decor heading-text">
@@ -17,28 +17,43 @@
     
 <tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
 <td class="singlecolumn"><table><tr><td class="multicolumn"><a href="nltk.html">nltk</a><br>
+</td><td class="multicolumn"><a href="pandas.html">pandas</a><br>
 </td><td class="multicolumn"><a href="re.html">re</a><br>
-</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
 <table class="section">
 <tr class="decor functions-decor heading-text">
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
     
 <tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><dl><dt><a name="-clean_text"><strong>clean_text</strong></a>(text: str) -&gt; str</dt><dd><span class="code">Cleans&nbsp;a&nbsp;string&nbsp;by&nbsp;removing&nbsp;non-word&nbsp;characters,&nbsp;converting&nbsp;to&nbsp;lowercase,<br>
-removing&nbsp;stopwords,&nbsp;and&nbsp;applying&nbsp;lemmatization.<br>
+<td class="singlecolumn"><dl><dt><a name="-clean_text"><strong>clean_text</strong></a>(text: str) -&gt; str</dt><dd><span class="code">Cleans&nbsp;a&nbsp;text&nbsp;string&nbsp;by&nbsp;removing&nbsp;special&nbsp;characters&nbsp;(keeping&nbsp;letters,&nbsp;numbers,&nbsp;and&nbsp;spaces),<br>
+converting&nbsp;to&nbsp;lowercase,&nbsp;tokenizing,&nbsp;lemmatizing,&nbsp;and&nbsp;removing&nbsp;stopwords.<br>
 &nbsp;<br>
 Args:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;text&nbsp;(str):&nbsp;Input&nbsp;text&nbsp;string.<br>
 &nbsp;<br>
 Returns:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;str:&nbsp;Cleaned&nbsp;and&nbsp;lemmatized&nbsp;text&nbsp;string.</span></dd></dl>
+ <dl><dt><a name="-process_text_dataframe"><strong>process_text_dataframe</strong></a>(df: pandas.core.frame.DataFrame, designation_col: str = 'designation', description_col: str = 'description') -&gt; pandas.core.frame.DataFrame</dt><dd><span class="code">Processes&nbsp;the&nbsp;text&nbsp;data&nbsp;in&nbsp;a&nbsp;DataFrame&nbsp;by&nbsp;merging&nbsp;the&nbsp;'designation'&nbsp;and&nbsp;'description'<br>
+columns,&nbsp;cleaning&nbsp;the&nbsp;text,&nbsp;tokenizing,&nbsp;lemmatizing,&nbsp;and&nbsp;removing&nbsp;stopwords.<br>
+Produces&nbsp;a&nbsp;new&nbsp;column&nbsp;'lemmatized_text'&nbsp;and&nbsp;drops&nbsp;unnecessary&nbsp;columns.<br>
+&nbsp;<br>
+Args:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;df&nbsp;(pd.DataFrame):&nbsp;Input&nbsp;DataFrame&nbsp;with&nbsp;raw&nbsp;text&nbsp;data.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;designation_col&nbsp;(str):&nbsp;Column&nbsp;name&nbsp;for&nbsp;designation.&nbsp;Default&nbsp;is&nbsp;'designation'.<br>
+&nbsp;&nbsp;&nbsp;&nbsp;description_col&nbsp;(str):&nbsp;Column&nbsp;name&nbsp;for&nbsp;description.&nbsp;Default&nbsp;is&nbsp;'description'.<br>
+&nbsp;<br>
+Returns:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;pd.DataFrame:&nbsp;Processed&nbsp;DataFrame&nbsp;with&nbsp;a&nbsp;new&nbsp;column&nbsp;'lemmatized_text'.</span></dd></dl>
 </td></tr></table><p>
 <table class="section">
 <tr class="decor data-decor heading-text">
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
     
 <tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><strong>lemmatizer</strong> = &lt;WordNetLemmatizer&gt;<br>
-<strong>stop_words</strong> = {'a', 'about', 'above', 'after', 'again', 'against', ...}<br>
+<td class="singlecolumn"><strong>custom_stopwords</strong> = {'100', 'cest', 'cet', 'chez', 'der', 'haut', ...}<br>
+<strong>lemmatizer</strong> = &lt;WordNetLemmatizer&gt;<br>
+<strong>stop_words</strong> = {'100', 'a', 'about', 'above', 'after', 'again', ...}<br>
+<strong>stop_words_eng</strong> = {'a', 'about', 'above', 'after', 'again', 'against', ...}<br>
+<strong>stop_words_fr</strong> = {'ai', 'aie', 'aient', 'aies', 'ait', 'as', ...}<br>
 <strong>stopwords</strong> = &lt;WordListCorpusReader in 'C:\\Users\\Isabell Gur...AppData\\Roaming\\nltk_data\\corpora\\stopwords'&gt;</td></tr></table>
 </body></html>
