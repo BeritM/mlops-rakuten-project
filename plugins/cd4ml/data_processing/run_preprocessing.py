@@ -12,8 +12,12 @@ from cd4ml.data_processing import (
 )
 
 def main():
-    # 1. Load combined data
-    df = load_combined_data("../../../data/raw/raw_x_y.csv")
+    # 1. Load combined data from separate CSV files and combine them
+    df = load_combined_data(
+        "../../../data/raw/X_train_update.csv",
+        "../../../data/raw/Y_train_CVw08PX.csv",
+        save_path="../../../data/raw/raw_x_y.csv"
+    )
 
     # 2. Clean text
     if "description" not in df.columns:
@@ -24,7 +28,8 @@ def main():
     if "prdtypecode" not in df.columns:
         raise KeyError("prdtypecode not found.")
     X_train, X_validate, X_test, y_train, y_validate, y_test = split_dataset(
-        df, target_column="prdtypecode")
+        df, target_column="prdtypecode"
+    )
 
     # 4. TF-IDF Transformation on training data
     X_train_tfidf, vectorizer = apply_tfidf(X_train["cleaned_text"])
