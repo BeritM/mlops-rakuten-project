@@ -116,6 +116,7 @@ multidict==6.0.2
 nanotime==0.5.2
 nest-asyncio==1.5.4
 networkx==2.7.1
+nltk>=3.6.2
 numpy==1.22.2
 oauthlib==3.2.0
 openapi-schema-validator==0.1.6
