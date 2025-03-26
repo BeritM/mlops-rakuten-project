@@ -41,7 +41,11 @@ import pandas as pd
 # Append project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from cd4ml.data_processing import load_combined_data, clean_text, split_dataset, apply_tfidf
+#from cd4ml.data_processing import load_combined_data, clean_text, split_dataset, apply_tfidf
+from step01_combine_xy import load_combined_data
+from step02_text_cleaning import clean_text
+from step03_split_data import split_dataset
+from step04_tfidf_transform import apply_tfidf
 
 def main():
     # Set directory paths for raw and processed data
