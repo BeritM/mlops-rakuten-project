@@ -1,1 +1,0 @@
-from cd4ml.model_training.train_model import train_model
