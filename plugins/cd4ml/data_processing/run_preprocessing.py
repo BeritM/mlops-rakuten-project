@@ -108,5 +108,6 @@ def main():
     print(f"Test Labels: {y_test.shape}")
     print(f"Vocabulary size: {len(vectorizer.vocabulary_)}")
 
+
 if __name__ == "__main__":
     main()
