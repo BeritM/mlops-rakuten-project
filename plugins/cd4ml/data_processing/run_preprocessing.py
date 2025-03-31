@@ -49,8 +49,10 @@ from step04_tfidf_transform import apply_tfidf
 
 def main():
     # Set directory paths for raw and processed data
-    raw_dir = "../../../data/raw"
-    proc_dir = "../../../data/processed"
+    raw_dir = "/data/raw"
+    #raw_dir = "../../../data/raw"
+    proc_dir = "/data/processed"
+    #proc_dir = "../../../data/processed"
     os.makedirs(proc_dir, exist_ok=True)
     
     # 1. Load combined data from separate CSV files and combine them
