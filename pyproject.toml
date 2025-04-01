@@ -1,5 +1,5 @@
 [project]
-name = "rakuten dvc-within-docker"
+name = "rakuten project dvc-within-docker"
 version = "0.1.0"
 description = "Rakuten project orchestration with dvc within docker containers"
 readme = "README.md"

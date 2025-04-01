@@ -7,7 +7,7 @@ uv:
 # Konfiguriere den DVC Remote mithilfe der Umgebungsvariablen
 set-dvc:
 	dvc remote add origin s3://dvc
-	dvc remote modify origin endpointurl https://dagshub.com/ssime-git/DVC_within_docker.s3
+	dvc remote modify origin endpointurl https://dagshub.com/BeritM/mlops-rakuten-project.s3
 	dvc remote modify origin --local access_key_id $(DVC_USER)
 	dvc remote modify origin --local secret_access_key $(DVC_PASSWORD)
 	dvc remote default origin

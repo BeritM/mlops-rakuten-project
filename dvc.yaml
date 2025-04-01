@@ -28,6 +28,18 @@ stages:
   #   outs:
   #     - models/sgd_text_model.pkl
 
+  # validate:
+  #   cmd: python plugins/cd4ml/model_training/validate.py \
+  #        --X data/processed/X_validate_tfidf.pkl \
+  #        --y data/processed/y_validate.csv \
+  #        --model models/sgd_text_model.pkl
+  #   deps:
+  #     - data/processed/X_validate_tfidf.pkl
+  #     - data/processed/y_validate.csv
+  #     - models/sgd_text_model.pkl
+  #   outs:
+  #     - validation_results.json
+
   inference:
     cmd: python plugins/cd4ml/inference/infer.py \
           --X data/processed/X_test_tfidf.pkl \
