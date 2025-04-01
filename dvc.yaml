@@ -26,18 +26,18 @@ stages:
   #     - data/processed/y_train.csv
   #     - plugins/cd4ml/model_training/train.py
   #   outs:
-  #     - models/model.pkl
+  #     - models/sgd_text_model.pkl
 
   inference:
     cmd: python plugins/cd4ml/inference/infer.py \
           --X data/processed/X_test_tfidf.pkl \
           --y data/processed/y_test.csv \
-          --model models/model.pkl \
+          --model models/sgd_text_model.pkl \
           --output predictions.csv
     deps:
       - data/processed/X_test_tfidf.pkl
       - data/processed/y_test.csv
-      - models/model.pkl
+      - models/sgd_text_model.pkl
       - plugins/cd4ml/inference/infer.py
     outs:
       - predictions.csv
