@@ -1,38 +1,38 @@
 .PHONY: uv set-dvc init-git init-dvc build run track dvc-docto all
 
-# Install the uv tool (from Astral)
+# Installiere das uv-Tool (von Astral)
 uv:
 	curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Configure DVC remote using Dagshub/S3 settings
+# Konfiguriere den DVC Remote mithilfe der Umgebungsvariablen
 set-dvc:
 	dvc remote add origin s3://dvc
 	dvc remote modify origin endpointurl https://dagshub.com/ssime-git/DVC_within_docker.s3
-	dvc remote modify origin --local access_key_id XXX
-	dvc remote modify origin --local secret_access_key XXX
+	dvc remote modify origin --local access_key_id $(DVC_USER)
+	dvc remote modify origin --local secret_access_key $(DVC_PASSWORD)
 	dvc remote default origin
 
-# Initialize a new Git repository and commit the initial structure
+# Initialisiere ein neues Git-Repository und committe die initiale Struktur
 init-git:
 	git init
 	git add .gitignore Dockerfile docker-compose.yml dvc.yaml src/
 	git commit -m "Initial project structure and pipeline definition"
 
-# Initialize DVC and commit the DVC configuration files
+# Initialisiere DVC und committe die DVC-Konfigurationsdateien
 init-dvc:
 	dvc init
 	git add .dvc/config .dvc/.gitignore
 	git commit -m "Initialize DVC"
 
-# Build the Docker Compose services
+# Baue die Docker Compose Services
 build:
 	docker compose build
 
-# Run the pipeline using the dedicated dvc-runner service
+# Führe die Pipeline im dedizierten dvc-runner Service aus
 run:
 	docker compose run --rm dvc-runner dvc repro
 
-# Track changes: commit updates in Git, commit DVC-tracked files, and push them
+# Verfolge Änderungen: committe Updates in Git, committe DVC-Änderungen und pushe sie
 track:
 	git add .
 	git commit -m "updating the run"
@@ -40,9 +40,9 @@ track:
 	git push
 	dvc push
 
-# Run a DVC diagnostic check using the dvc-runner service
+# Führe einen DVC-Diagnose-Check über den dvc-runner Service aus
 dvc-docto:
 	docker compose run --rm dvc-runner dvc doctor
 
-# Chain all key steps together:
+# Führe alle wesentlichen Schritte nacheinander aus
 all: init-git init-dvc build run

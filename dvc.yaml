@@ -1,0 +1,43 @@
+stages:
+  preprocess:
+    cmd: python plugins/cd4ml/data_processing/run_preprocessing.py
+    deps:
+      - plugins/cd4ml/data_processing/run_preprocessing.py
+    outs:
+      - data/raw/raw_x_y.csv
+      - data/processed/X_test.csv
+      - data/processed/X_test_tfidf.pkl
+      - data/processed/X_train.csv
+      - data/processed/X_train_tfidf.pkl
+      - data/processed/X_validate.csv
+      - data/processed/X_validate_tfidf.pkl
+      - data/processed/y_test.csv
+      - data/processed/y_train.csv
+      - data/processed/y_validate.csv
+
+#so oder so ähnlich:
+  # train:
+  #   cmd: python plugins/cd4ml/model_training/train.py \
+  #         --X data/processed/X_train_tfidf.pkl \
+  #         --y data/processed/y_train.csv \
+  #         --model-out models/model.pkl
+  #   deps:
+  #     - data/processed/X_train_tfidf.pkl
+  #     - data/processed/y_train.csv
+  #     - plugins/cd4ml/model_training/train.py
+  #   outs:
+  #     - models/model.pkl
+
+  inference:
+    cmd: python plugins/cd4ml/inference/infer.py \
+          --X data/processed/X_test_tfidf.pkl \
+          --y data/processed/y_test.csv \
+          --model models/model.pkl \
+          --output predictions.csv
+    deps:
+      - data/processed/X_test_tfidf.pkl
+      - data/processed/y_test.csv
+      - models/model.pkl
+      - plugins/cd4ml/inference/infer.py
+    outs:
+      - predictions.csv
