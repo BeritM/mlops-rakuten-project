@@ -20,7 +20,7 @@ set-dvc:
 # Initialisiert ein neues Git-Repository und committe die initiale Struktur
 init-git:
 	git init
-	git add .gitignore Dockerfile docker-compose.yml dvc.yaml src/
+	git add .gitignore Dockerfile docker-compose-dvc.yml dvc.yaml src/
 	git commit -m "Initial project structure and pipeline definition"
 
 # Initialisiert DVC und committe die DVC-Konfigurationsdateien
