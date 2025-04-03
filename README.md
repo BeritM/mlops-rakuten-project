@@ -1,11 +1,13 @@
-# Demonstrate how to use dvc within docker
+# Using DVC Within Docker: A Step-by-Step Guide
 
-1. Intsall uv with make uv
-2. Add your dagshub credentials to the Makefile at the set-dvc key and run make set-dvc
-3. Create a virtual environment with uv venv
-4. Install all packages and dependencies with uv sync
-5. Run the command below
+This guide demonstrates how to set up and run DVC within Docker containers using a Makefile to automate common tasks. Follow the steps below to get started.
 
-'''
-make all
-''' 
+## Overview of Steps
+
+1. **Install uv**  
+   Use the `make uv` command to install the uv tool (from Astral).
+
+2. **Configure Dagshub Credentials for DVC**  
+   Add your Dagshub credentials to the Makefile under the `set-dvc` target and run:
+   ```bash
+   make set-dvc
