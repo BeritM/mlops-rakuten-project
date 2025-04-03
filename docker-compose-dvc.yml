@@ -1,19 +1,22 @@
 services:
   dvc-sync:
     build:
-      context: .
+      context: ./dockerfiles/dvc
       dockerfile: Dockerfile
     volumes:
       - .:/workspace
       - dvc-cache:/workspace/.dvc/cache
     working_dir: /workspace
     environment:
+  # Authentification
       - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
       - MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
       - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
+      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN} 
+      - DAGSHUB_REPO_OWNER=DAGSHUB_REPO_OWNER
+      - DAGSHUB_REPO_NAME=DAGSHUB_REPO_NAME
     command: ["dvc", "pull"]
-
   preprocessing:
     build:
       context: ./plugins/cd4ml/data_processing

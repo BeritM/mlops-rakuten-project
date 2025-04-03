@@ -1,3 +1,7 @@
+# Purpose of this file: dvc.yaml is used to define the stages of the DVC pipeline
+# and the dependencies between them
+# it is used to track the data and models in the pipeline
+# and to define the commands to run the pipeline.
 stages:
   preprocess:
     cmd: python plugins/cd4ml/data_processing/run_preprocessing.py
@@ -40,16 +44,25 @@ stages:
   #   outs:
   #     - validation_results.json
 
+# # inference for batch-process: 
+#   inference:
+#     cmd: python plugins/cd4ml/inference/infer.py \
+#           --X data/processed/X_test_tfidf.pkl \
+#           --y data/processed/y_test.csv \
+#           --model models/sgd_text_model.pkl \
+#           --output predictions.csv
+#     deps:
+#       - data/processed/X_test_tfidf.pkl
+#       - data/processed/y_test.csv
+#       - models/sgd_text_model.pkl
+#       - plugins/cd4ml/inference/infer.py
+#     outs:
+#       - predictions.csv
+
+# # inference with uvicorn:
   inference:
-    cmd: python plugins/cd4ml/inference/infer.py \
-          --X data/processed/X_test_tfidf.pkl \
-          --y data/processed/y_test.csv \
-          --model models/sgd_text_model.pkl \
-          --output predictions.csv
+    # Statt eines Batch-Inferenz-Befehls wird hier ein API-Server gestartet.
+    cmd: uvicorn infer:app --host 0.0.0.0 --port 8000
     deps:
-      - data/processed/X_test_tfidf.pkl
-      - data/processed/y_test.csv
-      - models/sgd_text_model.pkl
       - plugins/cd4ml/inference/infer.py
-    outs:
-      - predictions.csv
+      - models/sgd_text_model.pkl # Es gibt hier kein "outs"-Feld, da der API-Server dauerhaft läuft und keine konkrete Datei als Output erzeugt.
