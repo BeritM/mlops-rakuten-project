@@ -1,14 +1,15 @@
 from model_training import load_train_data, calculate_class_weights, train_final_model
 import joblib
+import os
 
 def main():
     
     # Set paths for X and y data and output model folder
 
-    input_dir = "../../../data/processed"
-    output_dir = "../../../models"
-    X_train_tfidf_path = f"{input_dir}/X_train_tfidf.pkl"
-    y_train_path = f"{input_dir}/y_train.pkl"
+    input_dir = os.getenv("DATA_INPUT_DIR", "./data/processed")
+    output_dir = os.getenv("MODEL_OUTPUT_DIR", "./models")
+    X_train_tfidf_path = os.path.join(input_dir, "X_train_tfidf.pkl")
+    y_train_path = os.path.join(input_dir, "y_train.pkl")
 
     # 1. Load preprocessed data
 
