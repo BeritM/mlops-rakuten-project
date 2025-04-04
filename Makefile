@@ -5,11 +5,13 @@
 
 .PHONY: uv set-dvc init-git init-dvc build run track dvc-docto all
 
-# Installiert das uv-Tool (von Astral)
+# uv installs the uv tool, which is a command-line utility for managing DVC pipelines.
+# It is installed using a shell script from the Astral website. 
 uv:
 	curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Konfiguriert den DVC Remote mithilfe der Umgebungsvariablen
+# Set-dvc sets up the DVC remote storage configuration for the project.
+# It adds a remote storage location (S3 bucket) and configures the access credentials.
 set-dvc:
 	dvc remote add origin s3://dvc
 	dvc remote modify origin endpointurl https://dagshub.com/BeritM/mlops-rakuten-project.s3
@@ -17,27 +19,28 @@ set-dvc:
 	dvc remote modify origin --local secret_access_key $(DVC_PASSWORD)
 	dvc remote default origin
 
-# Initialisiert ein neues Git-Repository und committe die initiale Struktur
+# init-git initializes a new Git repository and commits the initial project structure
+# and pipeline definition files. It also creates a .gitignore file to exclude unnecessary files.
 init-git:
 	git init
 	git add .gitignore Dockerfile docker-compose-dvc.yml dvc.yaml src/
 	git commit -m "Initial project structure and pipeline definition"
 
-# Initialisiert DVC und committe die DVC-Konfigurationsdateien
+# Initialize DVC in the current directory and commit the configuration files
 init-dvc:
 	dvc init
 	git add .dvc/config .dvc/.gitignore
 	git commit -m "Initialize DVC"
 
-# Baut die Docker Compose Services
+# Build Docker images using Docker Compose
 build:
-	docker compose build
+	docker compose -f docker-compose-dvc.yml build
 
-# Führt die Pipeline im dedizierten dvc-runner Service aus
+# run the DVC pipeline using the dvc-runner service
 run:
 	docker compose run --rm dvc-runner dvc repro
 
-# Committet Updates in Git, committe DVC-Änderungen und pusht sie
+# track changes in the repository and push them to the remote DVC storage
 track:
 	git add .
 	git commit -m "updating the run"
@@ -45,9 +48,11 @@ track:
 	git push
 	dvc push
 
-# Führt einen DVC-Diagnose-Check über den dvc-runner Service aus
+# dvc-docto runs the DVC doctor command to check the health of the DVC setup
+# and configuration. It is useful for diagnosing issues with DVC pipelines.
 dvc-docto:
 	docker compose run --rm dvc-runner dvc doctor
 
-# Führt alle wesentlichen Schritte nacheinander aus
+# all is a target that runs all the tasks in the Makefile in sequence.
+# It initializes Git and DVC, builds the Docker images, and runs the DVC pipeline.
 all: init-git init-dvc build run
