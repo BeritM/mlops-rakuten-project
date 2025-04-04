@@ -61,7 +61,8 @@ stages:
 
 # # inference with uvicorn:
   inference:
-    # Statt eines Batch-Inferenz-Befehls wird hier ein API-Server gestartet.
+    # Instead of running the inference in a batch process, we run a uvicorn server that serves the model and allows for real-time inference.
+    # The server will be running indefinitely, so we don't need to specify an output file.
     cmd: uvicorn infer:app --host 0.0.0.0 --port 8000
     deps:
       - plugins/cd4ml/inference/infer.py
