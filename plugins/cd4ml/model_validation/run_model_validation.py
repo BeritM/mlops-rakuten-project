@@ -11,10 +11,11 @@ def main():
 
     # Set paths for X and y data and output model folder
 
-    input_dir = "../../../data/processed"
-    output_dir = "../../../models"
-    X_validate_tfidf_path = f"{input_dir}/X_validate_tfidf.pkl"
-    y_validate_path = f"{input_dir}/y_validate.pkl"
+    input_dir = os.getenv("DATA_INPUT_DIR", "./data/processed")
+    output_dir = os.getenv("MODEL_OUTPUT_DIR", "./models")
+
+    X_validate_tfidf_path = os.path.join(input_dir, "X_validate_tfidf.pkl")
+    y_validate_path = os.path.join(input_dir, "y_validate.pkl")
     model_file = "sgd_text_model.pkl"
 
     model = load_model(output_dir, model_file)
