@@ -1,0 +1,78 @@
+services:
+  dvc-sync:
+    build:
+      context: ./dockerfiles/dvc
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+      - dvc-cache:/workspace/.dvc/cache
+    working_dir: /workspace
+    environment:
+  # Authentification (keep only the ones we need)
+      - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
+      - MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
+      - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
+      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
+      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN} 
+      - DAGSHUB_REPO_OWNER=DAGSHUB_REPO_OWNER
+      - DAGSHUB_REPO_NAME=DAGSHUB_REPO_NAME
+    command: ["dvc", "pull"]
+  preprocessing:
+    build:
+      context: ./plugins/cd4ml/data_processing
+      dockerfile: Dockerfile
+    volumes:
+      - "./data:/data"
+    depends_on:
+      - dvc-sync
+    command: ["python", "run_preprocessing.py"]
+
+  model_training:
+    image: alpine
+    command: ["echo", "model_training placeholder"]
+
+################ save it for later ################
+  # model_training:
+  #   build:
+  #     context: .
+  #     dockerfile: ./cd4ml/model_training/Dockerfile
+  #   volumes:
+  #     - "./data:/data"
+  #   depends_on:
+  #     - preprocessing
+  #   command: ["python", "run_training.py"]
+
+  model_validation:
+    image: alpine
+    command: ["echo", "model_validation placeholder"]
+
+################ save it for later ################
+  # model_validation:
+  #   build:
+  #     context: .
+  #     dockerfile: ./cd4ml/model_validation/Dockerfile
+  #   volumes:
+  #     - "./data:/data"
+  #   depends_on:
+  #     - model_training
+  #   command: ["python", "run_validation.py"]
+  
+  inference:
+    build:
+      context: ./plugins/cd4ml/inference
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./data:/data"
+      - "./models:/app/models"
+      - dvc-cache:/workspace/.dvc/cache
+    depends_on:
+      - model_validation
+      - dvc-sync
+    env_file:
+      - .env
+    command: ["uvicorn", "infer:app", "--host", "0.0.0.0", "--port", "8000"]
+
+volumes:
+  dvc-cache:

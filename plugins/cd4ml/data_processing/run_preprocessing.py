@@ -49,8 +49,10 @@ from step04_tfidf_transform import apply_tfidf
 
 def main():
     # Set directory paths for raw and processed data
-    raw_dir = "../../../data/raw"
-    proc_dir = "../../../data/processed"
+    raw_dir = "/data/raw"
+    #raw_dir = "../../../data/raw"
+    proc_dir = "/data/processed"
+    #proc_dir = "../../../data/processed"
     os.makedirs(proc_dir, exist_ok=True)
     
     # 1. Load combined data from separate CSV files and combine them
@@ -105,6 +107,7 @@ def main():
     print(f"Validation Labels: {y_validate.shape}")
     print(f"Test Labels: {y_test.shape}")
     print(f"Vocabulary size: {len(vectorizer.vocabulary_)}")
+
 
 if __name__ == "__main__":
     main()
