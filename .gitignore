@@ -1,1 +1,20 @@
-/env
+.ipynb_checkpoints/
+
+# DVC cache
+.dvc/cache
+
+# Data files managed by DVC
+data/raw/
+data/processed/
+#model.sgd_text_model.pkl
+#models/tfidf_vectorizer.pkl
+
+# Python stuff
+__pycache__/
+*.pyc
+.venv/
+
+# env
+.env
+/model.joblibenv
+env

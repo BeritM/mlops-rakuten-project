@@ -2,23 +2,32 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
+# Install git (required by DVC)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    python3-dev \
+    git \
  && rm -rf /var/lib/apt/lists/*
 
-# Pip upgrade
+# Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
 
+# Install DVC and additional Python dependencies directly
+RUN pip install --no-cache-dir \
+    dvc \
+    pandas \
+    scikit-learn \
+    dagshub \
+    mlflow \
+    joblib
+
+# Copy requirements.txt and install additional Python packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all files
+# Copy all project files into the container
 COPY . .
 
-# Download NLTK data
+# Import nltk and download required datasets
 RUN python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('wordnet')"
 
-# Run the preprocessing script
+# Set the command to run the preprocessing script when the container starts
 CMD ["python", "run_preprocessing.py"]

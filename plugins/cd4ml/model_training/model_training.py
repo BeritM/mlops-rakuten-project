@@ -21,6 +21,7 @@ def load_train_data(X_train_tfidf_path: str, y_train_path: str) -> pd.DataFrame:
     """
 
     X_train_tfidf = pd.read_pickle(X_train_tfidf_path)
+    #X_train_tfidf = joblib.load(X_train_tfidf_path)
     y_train = pd.read_pickle(y_train_path)
 
     return X_train_tfidf, y_train
