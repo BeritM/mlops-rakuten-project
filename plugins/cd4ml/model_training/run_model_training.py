@@ -6,10 +6,13 @@ def main():
     
     # Set paths for X and y data and output model folder
 
-    input_dir = os.getenv("DATA_INPUT_DIR", "./data/processed")
-    output_dir = os.getenv("MODEL_OUTPUT_DIR", "./models")
+    input_dir = os.getenv("DATA_INPUT_DIR", "app/data/processed")
+    output_dir = os.getenv("MODEL_OUTPUT_DIR", "app/models")
     X_train_tfidf_path = os.path.join(input_dir, "X_train_tfidf.pkl")
     y_train_path = os.path.join(input_dir, "y_train.pkl")
+
+    print(f"Loading X_train_tfidf from {X_train_tfidf_path}")
+    print(f"Loading y_train from {y_train_path}")
 
     # 1. Load preprocessed data
 
