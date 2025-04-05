@@ -8,10 +8,11 @@ from nltk.corpus import stopwords
 
 # --- Class Definition ---
 class ProductTypePredictor:
-    def __init__(self, vectorizer_path, model_path):
+    def __init__(self, vectorizer_path, model_path, product_dictionary_path):
         self.stop_words = self._load_stopwords()
         self.vectorizer = self._load_pickle(vectorizer_path)
         self.model = self._load_pickle(model_path)
+        self.product_dictionary = self._load_pickle(product_dictionary_path)
 
     def _load_pickle(self, path):
         with open(path, "rb") as f:
@@ -41,6 +42,8 @@ class ProductTypePredictor:
         combined_text = f"{designation} {description}"
         vectorized = self.preprocess(combined_text)
         prediction = self.model.predict(vectorized)[0]
+        print(prediction, type(prediction))
+        prediction = self.product_dictionary[prediction]
         return prediction
 
 
@@ -50,7 +53,8 @@ app = FastAPI()
 # Load model and vectorizer
 predictor = ProductTypePredictor(
     vectorizer_path="models/tfidf_vectorizer.pkl",
-    model_path="models/sgd_text_model.pkl"
+    model_path="models/sgd_text_model.pkl",
+    product_dictionary_path = "models/product_dictionary.pkl"
 )
 
 # --- Request Body Schema ---
