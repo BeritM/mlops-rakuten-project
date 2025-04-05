@@ -46,7 +46,7 @@ services:
 
   model_validation:
     build:
-      context: .plugins/cd4ml/model_validation
+      context: ./plugins/cd4ml/model_validation
       dockerfile: Dockerfile
     volumes:
       - "./data:/data"
