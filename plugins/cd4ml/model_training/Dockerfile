@@ -14,11 +14,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r requirements-model.txt && \
     pip install --no-cache-dir \
     dvc \
-    dagshub \
-    pandas \
-    mlflow \
-    joblib \
-    scikit-learn
+    dvc[s3] \
+    dagshub
 
 
 ENV MODEL_OUTPUT_DIR=/app/models

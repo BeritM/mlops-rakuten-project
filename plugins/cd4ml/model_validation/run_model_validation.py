@@ -1,8 +1,6 @@
 import sys
 import os
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../model_training")))
-
 from model_validation import load_model, prediction_and_metrics, save_txt_file
 from model_training import load_train_data
 

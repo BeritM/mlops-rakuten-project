@@ -2,16 +2,20 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY plugins/cd4ml/model_validation/model_validation.py /app/
-COPY plugins/cd4ml/model_training/model_training.py /app/
-COPY plugins/cd4ml/model_validation/run_model_validation.py /app/
-COPY plugins/cd4ml/model_training/requirements-model.txt /app/
-COPY data/processed /app/data/processed
-COPY models /app/models
+COPY model_validation.py /app/
+COPY model_training.py /app/
+COPY run_model_validation.py /app/
+COPY requirements-model.txt /app/
 
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r /app/requirements-model.txt
-
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r /app/requirements-model.txt && \
+    pip install --no-cache-dir \
+    dvc \
+    dvc[s3] \
+    dagshub
 
 ENV MODEL_OUTPUT_DIR=/app/models
 ENV DATA_INPUT_DIR=/app/data/processed
