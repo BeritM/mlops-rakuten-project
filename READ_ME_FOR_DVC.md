@@ -16,4 +16,4 @@ How To: DVC Setup
 - dvc remote modify origin --local access_key_id <your access key id>
 - dvc remote modify origin --local secret_access_key <your access key>
 
-5. Now DVC should be running with Dagshub as the remote storage. 
+5. Now execute: dvc pull and it should be running with Dagshub as the remote storage. 
