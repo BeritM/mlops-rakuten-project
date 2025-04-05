@@ -4,10 +4,12 @@
 .dvc/cache
 
 # Data files managed by DVC
-data/raw/
-data/processed/
-#model.sgd_text_model.pkl
-#models/tfidf_vectorizer.pkl
+shared_volume/data/raw/*
+shared_volume/data/processed/*
+shared_volume/models/*
+!shared_volume/data/raw/.gitkeep
+!shared_volume/data/processed/.gitkeep
+!shared_volume/models/.gitkeep
 
 # Python stuff
 __pycache__/
