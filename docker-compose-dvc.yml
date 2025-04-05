@@ -12,7 +12,6 @@ services:
     #  - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
     #  - MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
     #  - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
-      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN} 
       - DAGSHUB_REPO_OWNER=DAGSHUB_REPO_OWNER
       - DAGSHUB_REPO_NAME=DAGSHUB_REPO_NAME
@@ -37,6 +36,8 @@ services:
       - "./models:/app/models"
     depends_on:
       - preprocessing
+    env_file:
+      - .env
     environment:
       - MODEL_OUTPUT_DIR=/app/models
       - DATA_INPUT_DIR=/app/data/processed
@@ -52,24 +53,26 @@ services:
       - "./models:/app/models"
     depends_on:
       - model_training
+    env_file:
+      - .env
     command: ["python", "run_model_validation.py"]
   
-  #inference:
-  #  build:
-  #    context: ./plugins/cd4ml/inference
-  #    dockerfile: Dockerfile
-  #  ports:
-  #    - "8000:8000"
-  #  volumes:
-  #    - "./data:/data"
-  #    - "./models:/app/models"
-  #    - dvc-cache:/workspace/.dvc/cache
-  #  depends_on:
-  #    - model_validation
-  #    - dvc-sync
-  #  env_file:
-  #    - .env
-  #  command: ["uvicorn", "infer:app", "--host", "0.0.0.0", "--port", "8000"]
+  inference:
+    build:
+      context: ./plugins/cd4ml/inference
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./data:/data"
+      - "./models:/app/models"
+      - dvc-cache:/workspace/.dvc/cache
+    depends_on:
+      - model_validation
+      - dvc-sync
+    env_file:
+      - .env
+    command: ["uvicorn", "infer:app", "--host", "0.0.0.0", "--port", "8000"]
 
 volumes:
   dvc-cache:
