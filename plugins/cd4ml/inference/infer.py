@@ -43,7 +43,7 @@ class ProductTypePredictor:
         vectorized = self.preprocess(combined_text)
         prediction = self.model.predict(vectorized)[0]
         print(prediction, type(prediction))
-        prediction = self.product_dictionary[prediction]
+        prediction = self.product_dictionary[str(prediction)]
         return prediction
 
 
@@ -52,7 +52,7 @@ app = FastAPI()
 
 # Load model and vectorizer
 predictor = ProductTypePredictor(
-    vectorizer_path="models/tfidf_vectorizer.pkl",
+    vectorizer_path="data/processed/tfidf_vectorizer.pkl",
     model_path="models/sgd_text_model.pkl",
     product_dictionary_path = "models/product_dictionary.pkl"
 )
