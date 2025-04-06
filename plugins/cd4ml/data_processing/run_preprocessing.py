@@ -98,6 +98,11 @@ def main():
     }.items():
         df_item.to_csv(f"{proc_dir}/{name}.csv", index=False)
 
+    # Save y_train and y_validate as a pickle file
+    y_train.to_pickle(f"{proc_dir}/y_train.pkl")
+    y_validate.to_pickle(f"{proc_dir}/y_validate.pkl")
+
+
     # Summary output
     print("Preprocessing finished!")
     print(f"TF-IDF Shape (Train): {X_train_tfidf.shape}")
