@@ -13,15 +13,16 @@ services:
     #  - MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
     #  - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN} 
-      - DAGSHUB_REPO_OWNER=DAGSHUB_REPO_OWNER
-      - DAGSHUB_REPO_NAME=DAGSHUB_REPO_NAME
-    command: ["dvc", "pull"]
+      - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
+      - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
+    command: ["dvc", "pull", "--force"]
+    # command: ["dvc", "pull"]
   preprocessing:
     build:
       context: ./plugins/cd4ml/data_processing
       dockerfile: Dockerfile
     volumes:
-      - "./shared_volume/data:/data"
+      - "./shared_volume/data:/app/data"
     depends_on:
       - dvc-sync
     command: ["python", "run_preprocessing.py"]
@@ -32,8 +33,8 @@ services:
       context: ./plugins/cd4ml/model_training
       dockerfile: Dockerfile
     volumes:
-      - "./shared_volume/data:/data"
-      - "./shared_volume/models:/models"
+      - "./shared_volume/data:/app/data"
+      - "./shared_volume/models:/app/models"
     depends_on:
       - preprocessing
     env_file:
@@ -49,8 +50,8 @@ services:
       context: ./plugins/cd4ml/model_validation
       dockerfile: Dockerfile
     volumes:
-      - "./shared_volume/data:/data"
-      - "./shared_volume/models:/models"
+      - "./shared_volume/data:/app/data"
+      - "./shared_volume/models:/app/models"
     depends_on:
       - model_training
     env_file:
@@ -64,8 +65,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - "./shared_volume/data:/data"
-      - "./shared_volume/models:/models"
+      - "./shared_volume/data:/app/data"
+      - "./shared_volume/models:/app/models"
       - dvc-cache:/workspace/.dvc/cache
     depends_on:
       - model_validation
