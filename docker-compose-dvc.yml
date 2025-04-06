@@ -21,7 +21,7 @@ services:
       context: ./plugins/cd4ml/data_processing
       dockerfile: Dockerfile
     volumes:
-      - "./data:/data"
+      - "./shared_volume/data:/data"
     depends_on:
       - dvc-sync
     command: ["python", "run_preprocessing.py"]
@@ -32,8 +32,8 @@ services:
       context: ./plugins/cd4ml/model_training
       dockerfile: Dockerfile
     volumes:
-      - "./data:/data"
-      - "./models:/app/models"
+      - "./shared_volume/data:/data"
+      - "./shared_volume/models:/models"
     depends_on:
       - preprocessing
     env_file:
@@ -49,8 +49,8 @@ services:
       context: ./plugins/cd4ml/model_validation
       dockerfile: Dockerfile
     volumes:
-      - "./data:/data"
-      - "./models:/app/models"
+      - "./shared_volume/data:/data"
+      - "./shared_volume/models:/models"
     depends_on:
       - model_training
     env_file:
@@ -64,8 +64,8 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - "./data:/data"
-      - "./models:/app/models"
+      - "./shared_volume/data:/data"
+      - "./shared_volume/models:/models"
       - dvc-cache:/workspace/.dvc/cache
     depends_on:
       - model_validation
