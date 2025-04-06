@@ -22,7 +22,7 @@ services:
       context: ./plugins/cd4ml/data_processing
       dockerfile: Dockerfile
     volumes:
-      - "./shared_volume/data:/app/data"
+      - "./shared_volume/data:/data"
     depends_on:
       - dvc-sync
     command: ["python", "run_preprocessing.py"]
@@ -36,8 +36,8 @@ services:
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
     depends_on:
-      - preprocessing:
-          condition: service_completed_successfully
+      preprocessing:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
@@ -54,8 +54,8 @@ services:
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
     depends_on:
-      - model_training:
-          condition: service_completed_successfully
+      model_training:
+        condition: service_completed_successfully
     env_file:
       - .env
     command: ["python", "run_model_validation.py"]
@@ -71,9 +71,10 @@ services:
       - "./shared_volume/models:/app/models"
       - dvc-cache:/workspace/.dvc/cache
     depends_on:
-      - model_validation:
-          condition: service_completed_successfully
-      - dvc-sync
+      model_validation:
+        condition: service_completed_successfully
+      dvc-sync:
+        condition: service_completed_successfully
     env_file:
       - .env
     command: ["uvicorn", "infer:app", "--host", "0.0.0.0", "--port", "8000"]
