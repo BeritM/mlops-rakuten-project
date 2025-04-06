@@ -36,7 +36,8 @@ services:
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
     depends_on:
-      - preprocessing
+      - preprocessing:
+          condition: service_completed_successfully
     env_file:
       - .env
     environment:
@@ -53,7 +54,8 @@ services:
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
     depends_on:
-      - model_training
+      - model_training:
+          condition: service_completed_successfully
     env_file:
       - .env
     command: ["python", "run_model_validation.py"]
@@ -69,7 +71,8 @@ services:
       - "./shared_volume/models:/app/models"
       - dvc-cache:/workspace/.dvc/cache
     depends_on:
-      - model_validation
+      - model_validation:
+          condition: service_completed_successfully
       - dvc-sync
     env_file:
       - .env
