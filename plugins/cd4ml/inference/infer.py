@@ -1,5 +1,5 @@
 import re
-import pickle
+import joblib
 from fastapi import FastAPI
 from pydantic import BaseModel
 from nltk.corpus import stopwords
@@ -16,7 +16,7 @@ class ProductTypePredictor:
 
     def _load_pickle(self, path):
         with open(path, "rb") as f:
-            return pickle.load(f)
+            return joblib.load(f)
 
     def _load_stopwords(self):
         stop_words_eng = set(stopwords.words("english"))
@@ -43,7 +43,7 @@ class ProductTypePredictor:
         vectorized = self.preprocess(combined_text)
         prediction = self.model.predict(vectorized)[0]
         print(prediction, type(prediction))
-        prediction = self.product_dictionary[prediction]
+        prediction = self.product_dictionary[int(prediction)]
         return prediction
 
 
@@ -52,7 +52,7 @@ app = FastAPI()
 
 # Load model and vectorizer
 predictor = ProductTypePredictor(
-    vectorizer_path="models/tfidf_vectorizer.pkl",
+    vectorizer_path="data/processed/tfidf_vectorizer.pkl",
     model_path="models/sgd_text_model.pkl",
     product_dictionary_path = "models/product_dictionary.pkl"
 )

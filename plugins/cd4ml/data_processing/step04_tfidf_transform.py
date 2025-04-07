@@ -61,5 +61,8 @@ def apply_tfidf(
         if 'test' in save_paths:
             with open(save_paths['test'], 'wb') as f:
                 pickle.dump(X_test_tfidf, f)
+        if 'vectorizer' in save_paths:
+            with open(save_paths['vectorizer'], 'wb') as f:
+                pickle.dump(vectorizer, f)
     
     return X_train_tfidf, X_validate_tfidf, X_test_tfidf, vectorizer

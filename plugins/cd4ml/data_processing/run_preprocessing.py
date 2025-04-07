@@ -78,7 +78,8 @@ def main():
     tfidf_paths = {
         "train": f"{proc_dir}/X_train_tfidf.pkl",
         "validate": f"{proc_dir}/X_validate_tfidf.pkl",
-        "test": f"{proc_dir}/X_test_tfidf.pkl"
+        "test": f"{proc_dir}/X_test_tfidf.pkl",
+        "vectorizer": f"{proc_dir}/tfidf_vectorizer.pkl"
     }
     X_train_tfidf, X_validate_tfidf, X_test_tfidf, vectorizer = apply_tfidf(
         X_train["cleaned_text"],
@@ -97,6 +98,11 @@ def main():
         "y_test": y_test
     }.items():
         df_item.to_csv(f"{proc_dir}/{name}.csv", index=False)
+
+    # Save y_train and y_validate as a pickle file
+    y_train.to_pickle(f"{proc_dir}/y_train.pkl")
+    y_validate.to_pickle(f"{proc_dir}/y_validate.pkl")
+
 
     # Summary output
     print("Preprocessing finished!")
