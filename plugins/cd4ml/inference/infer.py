@@ -43,7 +43,7 @@ class ProductTypePredictor:
         vectorized = self.preprocess(combined_text)
         prediction = self.model.predict(vectorized)[0]
         print(prediction, type(prediction))
-        prediction = self.product_dictionary[str(prediction)]
+        prediction = self.product_dictionary[int(prediction)]
         return prediction
 
 
