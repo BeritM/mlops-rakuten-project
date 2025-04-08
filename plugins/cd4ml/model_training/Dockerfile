@@ -10,7 +10,7 @@ COPY model_training.py /app/
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
  && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-model.txt && \
     pip install --no-cache-dir \
     dvc \
