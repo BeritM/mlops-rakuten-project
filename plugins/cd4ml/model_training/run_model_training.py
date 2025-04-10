@@ -5,8 +5,11 @@ import mlflow
 import mlflow.sklearn
 from sklearn.metrics import f1_score, classification_report
 
-DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_REPO_OWNER")
+#import dagshub
+
+DAGSHUB_USER_NAME = os.getenv("DAGSHUB_USER_NAME")
 DAGSHUB_USER_TOKEN = os.getenv("DAGSHUB_USER_TOKEN")
+DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_REPO_OWNER")
 DAGSHUB_REPO_NAME = os.getenv("DAGSHUB_REPO_NAME")
 
 def main():
@@ -42,7 +45,8 @@ def main():
     # 3. Train selected model
     # 3.1 Set MLFlow
 
-    tracking_uri = f"https://{DAGSHUB_REPO_OWNER}:{DAGSHUB_USER_TOKEN}@dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow"
+    #dagshub.init(repo_owner=DAGSHUB_REPO_OWNER, repo_name=DAGSHUB_REPO_NAME, mlflow=True)
+    tracking_uri = f"https://{DAGSHUB_USER_NAME}:{DAGSHUB_USER_TOKEN}@dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow"
 
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("rakuten_final_model")
