@@ -1,5 +1,6 @@
 import re
 import joblib
+import mlflow
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -8,6 +9,9 @@ from jose import JWTError, jwt
 from typing import Dict
 from hashlib import sha256
 from datetime import datetime, timedelta
+import os
+import mlflow
+
 
 # --- JWT Configuration ---
 SECRET_KEY = "your_secret_key_here"
@@ -56,17 +60,35 @@ class UserCreate(BaseModel):
     password: str
     role: str = "user"
 
-# --- Product Type Predictor Class (unchanged) ---
-class ProductTypePredictor:
-    def __init__(self, vectorizer_path, model_path, product_dictionary_path):
-        self.stop_words = self._load_stopwords()
-        self.vectorizer = self._load_pickle(vectorizer_path)
-        self.model = self._load_pickle(model_path)
-        self.product_dictionary = self._load_pickle(product_dictionary_path)
+# --- Import dagshub ---
+DAGSHUB_USER_NAME = os.getenv("DAGSHUB_USER_NAME")
+DAGSHUB_USER_TOKEN = os.getenv("DAGSHUB_USER_TOKEN")
+DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_REPO_OWNER")
+DAGSHUB_REPO_NAME = os.getenv("DAGSHUB_REPO_NAME")
 
-    def _load_pickle(self, path):
-        with open(path, "rb") as f:
-            return joblib.load(f)
+# --- Load Model from MLflow/DagsHub ---
+tracking_uri = f"https://{DAGSHUB_USER_NAME}:{DAGSHUB_USER_TOKEN}@dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow"
+
+mlflow.set_tracking_uri(tracking_uri)
+mlflow.set_experiment("rakuten_final_model")
+# Load the latest model version
+model_name = "SGDClassifier_Model"
+latest_model = mlflow.pyfunc.load_model(model_uri=f"models:/{model_name}/latest")
+model_details = mlflow.MlflowClient().get_latest_versions(model_name, stages=["None", "Production"])[-1]
+
+# Extract parameters and metrics
+model_params = mlflow.MlflowClient().get_run(model_details.run_id).data.params
+model_metrics = mlflow.MlflowClient().get_run(model_details.run_id).data.metrics
+
+# --- Predictor Wrapper using MLflow ---
+class ProductTypePredictorMLflow:
+    def __init__(self, model, vectorizer_path, product_dictionary_path):
+        self.model = model
+        self.stop_words = self._load_stopwords()
+        with open(vectorizer_path, "rb") as f:
+            self.vectorizer = joblib.load(f)
+        with open(product_dictionary_path, "rb") as f:
+            self.product_dictionary = joblib.load(f)
 
     def _load_stopwords(self):
         stop_words_eng = set(stopwords.words("english"))
@@ -81,16 +103,26 @@ class ProductTypePredictor:
         return self.vectorizer.transform([cleaned])
 
     def predict(self, designation, description=""):
+        # input validation - only strings allowed
+        if not isinstance(designation, str):
+            raise ValueError("designation muss ein String sein.")
+        if not isinstance(description, str):
+            raise ValueError("description muss ein String sein.")
+        
         combined_text = f"{designation} {description}"
         vectorized = self.preprocess(combined_text)
         prediction = self.model.predict(vectorized)[0]
-        return self.product_dictionary[int(prediction)]
+        print(prediction, type(prediction))
+        prediction = self.product_dictionary[int(prediction)]
+        return prediction
 
-predictor = ProductTypePredictor(
+
+predictor = ProductTypePredictorMLflow(
+    model=latest_model,
     vectorizer_path="data/processed/tfidf_vectorizer.pkl",
-    model_path="models/sgd_text_model.pkl",
-    product_dictionary_path="models/product_dictionary.pkl"
+    product_dictionary_path = "models/product_dictionary.pkl"
 )
+
 
 # --- Authentication Endpoints ---
 @app.post("/login")
@@ -108,6 +140,23 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
 def predict_product_type(request: PredictionRequest, user=Depends(verify_token)):
     prediction = predictor.predict(request.designation, request.description)
     return {"predicted_class": prediction}
+
+# --- Model Information Endpoint ---
+@app.get("/model-info")
+def get_model_info(user=Depends(verify_token)):
+    info = {
+        "model_version": model_details.version,
+        "registered_at": datetime.fromtimestamp(model_details.creation_timestamp / 1000).isoformat(),
+        "parameters": {
+            "alpha": model_params.get("alpha"),
+            "loss": model_params.get("loss"),
+            "max_iter": model_params.get("max_iter"),
+        },
+        "metrics": {
+            "f1_weighted": model_metrics.get("f1_weighted")
+        }
+    }
+    return info
 
 # --- Admin-only Endpoints ---
 def admin_required(user=Depends(verify_token)):
