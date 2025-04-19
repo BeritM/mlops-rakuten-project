@@ -14,5 +14,7 @@ __pycache__/
 .git/
 .gitignore
 
+*.log
+
 # Exclude pydoc in data_processing folder
 plugins/cd4ml/data_processing/preprocessing_pydoc.py
