@@ -1,0 +1,18 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments and env files
+.venv/
+.env
+
+# Git directory and gitignore
+.git/
+.gitignore
+
+# Exclude pydoc in data_processing folder
+plugins/cd4ml/data_processing/preprocessing_pydoc.py
