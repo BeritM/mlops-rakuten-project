@@ -13,6 +13,7 @@ __pycache__/
 # Git directory and gitignore
 .git/
 .gitignore
+.gitkeep
 
 *.log
 

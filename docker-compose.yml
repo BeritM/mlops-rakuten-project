@@ -28,8 +28,8 @@ services:
 
   model_training:
     build:
-      context: ./plugins/cd4ml/model_training
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dockerfiles/model_training/Dockerfile
     volumes:
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
@@ -41,7 +41,7 @@ services:
     environment:
       - MODEL_OUTPUT_DIR=/app/models
       - DATA_INPUT_DIR=/app/data/processed
-    command: ["python", "run_model_training.py"]
+    command: ["python", "plugins/cd4ml/model_training/run_model_training.py"]
 
 
   model_validation:
