@@ -46,8 +46,8 @@ services:
 
   model_validation:
     build:
-      context: ./plugins/cd4ml/model_validation
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dockerfiles/model_validation/Dockerfile
     volumes:
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
@@ -56,7 +56,7 @@ services:
         condition: service_completed_successfully
     env_file:
       - .env
-    command: ["python", "run_model_validation.py"]
+    command: ["python", "plugins/cd4ml/model_validation/run_model_validation.py"]
   
   inference:
     build:
