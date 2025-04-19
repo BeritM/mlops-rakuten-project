@@ -4,7 +4,7 @@ nltk==3.9.1
 pandas==2.2.3
 scikit-learn==1.6.1
 setuptools>=68.1.2
-#dvc>=2.0.0
-#dvc[s3]==3.59.1
 dagshub==0.1.0
-#mlflow==2.0.0
+dvc[s3]
+joblib
+mlflow
