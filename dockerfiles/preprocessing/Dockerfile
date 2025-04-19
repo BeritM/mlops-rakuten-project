@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install requests==2.28.0
 
 
 # Copy requirements.txt
