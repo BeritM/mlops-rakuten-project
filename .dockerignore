@@ -1,5 +1,6 @@
 # Python bytecode
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *$py.class
 
@@ -9,13 +10,26 @@ __pycache__/
 # Virtual environments and env files
 .venv/
 .env
+*.pem
+*.key
+
 
 # Git directory and gitignore
 .git/
 .gitignore
 .gitkeep
 
+# Logfiles & Temp
 *.log
+tmp/
+/temp/
+
+# Mac/Windows Artefakte
+.DS_Store
+Thumbs.db
+
+# IDE/Editor
+.vscode/
 
 # Exclude pydoc in data_processing folder
 plugins/cd4ml/data_processing/preprocessing_pydoc.py
