@@ -9,27 +9,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
-RUN pip install requests==2.28.0
 
-# Install DVC and additional Python dependencies directly
-RUN pip install --no-cache-dir \
-    dvc \
-    dvc[s3] \
-    #pandas \
-    scikit-learn \
-    dagshub \
-    mlflow \
-    joblib
 
-# Copy requirements.txt and install additional Python packages
-COPY requirements.txt .
+# Copy requirements.txt
+COPY dockerfiles/preprocessing/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy all project files into the container
 COPY . .
 
-# Import nltk and download required datasets
+# Download NLTK data during build so tokenizers and wordlists are ready at runtime – this is best practice because it ensures a deterministic, offline-capable image and faster container startup.
 RUN python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('wordnet')"
 
+
 # Set the command to run the preprocessing script when the container starts
-CMD ["python", "run_preprocessing.py"]
+CMD ["python", "plugins/cd4ml/data_processing/run_preprocessing.py"]

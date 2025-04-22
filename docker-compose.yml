@@ -8,10 +8,7 @@ services:
       - dvc-cache:/workspace/.dvc/cache
     working_dir: /workspace
     environment:
-  # Authentification (keep only the ones we need)
-    #  - MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
-    #  - MLFLOW_TRACKING_USERNAME=${MLFLOW_TRACKING_USERNAME}
-    #  - MLFLOW_TRACKING_PASSWORD=${MLFLOW_TRACKING_PASSWORD}
+  # Authentification
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN} 
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
@@ -19,20 +16,20 @@ services:
     # command: ["dvc", "pull"]
   preprocessing:
     build:
-      context: ./plugins/cd4ml/data_processing
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dockerfiles/preprocessing/Dockerfile
     volumes:
       - "./shared_volume/data:/data"
     depends_on:
       dvc-sync:
         condition: service_completed_successfully
-    command: ["python", "run_preprocessing.py"]
+    command: ["python", "plugins/cd4ml/data_processing/run_preprocessing.py"]
 
 
   model_training:
     build:
-      context: ./plugins/cd4ml/model_training
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dockerfiles/model_training/Dockerfile
     volumes:
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
@@ -44,13 +41,13 @@ services:
     environment:
       - MODEL_OUTPUT_DIR=/app/models
       - DATA_INPUT_DIR=/app/data/processed
-    command: ["python", "run_model_training.py"]
+    command: ["python", "plugins/cd4ml/model_training/run_model_training.py"]
 
 
   model_validation:
     build:
-      context: ./plugins/cd4ml/model_validation
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dockerfiles/model_validation/Dockerfile
     volumes:
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
@@ -59,12 +56,12 @@ services:
         condition: service_completed_successfully
     env_file:
       - .env
-    command: ["python", "run_model_validation.py"]
+    command: ["python", "plugins/cd4ml/model_validation/run_model_validation.py"]
   
   inference:
     build:
-      context: ./plugins/cd4ml/inference
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dockerfiles/inference/Dockerfile
     ports:
       - "8000:8000"
     volumes:
@@ -78,7 +75,6 @@ services:
         condition: service_completed_successfully
     env_file:
       - .env
-    command: ["uvicorn", "infer:app", "--host", "0.0.0.0", "--port", "8000"]
-
+    command: ["uvicorn", "plugins.cd4ml.inference.infer:app", "--host", "0.0.0.0", "--port", "8000"]
 volumes:
   dvc-cache:
