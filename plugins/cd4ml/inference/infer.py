@@ -11,6 +11,8 @@ from hashlib import sha256
 from datetime import datetime, timedelta
 import os
 import mlflow
+from mlflow.tracking import MlflowClient
+
 
 
 # --- JWT Configuration ---
@@ -71,14 +73,19 @@ tracking_uri = f"https://{DAGSHUB_USER_NAME}:{DAGSHUB_USER_TOKEN}@dagshub.com/{D
 
 mlflow.set_tracking_uri(tracking_uri)
 mlflow.set_experiment("rakuten_final_model")
+
 # Load the latest model version
 model_name = "SGDClassifier_Model"
-latest_model = mlflow.pyfunc.load_model(model_uri=f"models:/{model_name}/latest")
-model_details = mlflow.MlflowClient().get_latest_versions(model_name, stages=["None", "Production"])[-1]
+model_uri = f"models:/{model_name}@production"
+production_model = mlflow.pyfunc.load_model(model_uri=model_uri)
+
+client = MlflowClient()
+prod_model_version = client.get_model_version_by_alias(model_name, "production")
 
 # Extract parameters and metrics
-model_params = mlflow.MlflowClient().get_run(model_details.run_id).data.params
-model_metrics = mlflow.MlflowClient().get_run(model_details.run_id).data.metrics
+run_info = client.get_run(prod_model_version.run_id)
+model_params = run_info.data.params
+model_metrics = run_info.data.metrics
 
 # --- Predictor Wrapper using MLflow ---
 class ProductTypePredictorMLflow:
@@ -105,9 +112,9 @@ class ProductTypePredictorMLflow:
     def predict(self, designation, description=""):
         # input validation - only strings allowed
         if not isinstance(designation, str):
-            raise ValueError("designation muss ein String sein.")
+            raise ValueError("designation has to be a string.")
         if not isinstance(description, str):
-            raise ValueError("description muss ein String sein.")
+            raise ValueError("description has to be a string.")
         
         combined_text = f"{designation} {description}"
         vectorized = self.preprocess(combined_text)
@@ -118,7 +125,8 @@ class ProductTypePredictorMLflow:
 
 
 predictor = ProductTypePredictorMLflow(
-    model=latest_model,
+    #model=latest_model,
+    model=production_model,
     vectorizer_path="data/processed/tfidf_vectorizer.pkl",
     product_dictionary_path = "models/product_dictionary.pkl"
 )
@@ -145,8 +153,8 @@ def predict_product_type(request: PredictionRequest, user=Depends(verify_token))
 @app.get("/model-info")
 def get_model_info(user=Depends(verify_token)):
     info = {
-        "model_version": model_details.version,
-        "registered_at": datetime.fromtimestamp(model_details.creation_timestamp / 1000).isoformat(),
+        "model_version": prod_model_version.version,
+        "registered_at": datetime.fromtimestamp(prod_model_version.creation_timestamp / 1000).isoformat(),
         "parameters": {
             "alpha": model_params.get("alpha"),
             "loss": model_params.get("loss"),
