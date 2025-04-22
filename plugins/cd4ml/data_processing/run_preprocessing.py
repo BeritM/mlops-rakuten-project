@@ -102,6 +102,7 @@ def main():
     # Save y_train and y_validate as a pickle file
     y_train.to_pickle(f"{proc_dir}/y_train.pkl")
     y_validate.to_pickle(f"{proc_dir}/y_validate.pkl")
+    y_test.to_pickle(f"{proc_dir}/y_test.pkl")
 
 
     # Summary output
