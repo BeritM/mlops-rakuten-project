@@ -19,10 +19,13 @@ services:
       context: .
       dockerfile: dockerfiles/preprocessing/Dockerfile
     volumes:
-      - "./shared_volume/data:/data"
+      - "./shared_volume/data:/app/data"
+      - "./shared_volume/models:/app/models"
     depends_on:
       dvc-sync:
         condition: service_completed_successfully
+    env_file:
+      - .env
     command: ["python", "plugins/cd4ml/data_processing/run_preprocessing.py"]
 
 
