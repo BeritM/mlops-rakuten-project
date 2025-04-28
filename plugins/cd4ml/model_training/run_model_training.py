@@ -5,6 +5,7 @@ import mlflow
 import mlflow.sklearn
 from mlflow.models.signature import infer_signature
 from sklearn.metrics import f1_score, classification_report
+import yaml
 
 #import dagshub env variables
 
@@ -24,6 +25,13 @@ Y_VALIDATE_PATH = os.path.join(INPUT_DIR, os.getenv("Y_VALIDATE"))
 MODEL_PATH = os.path.join(OUTPUT_DIR, os.getenv("MODEL"))
 class_report_path = os.path.join(OUTPUT_DIR, "training_class_report.txt")
 
+# Load config file:
+def load_config(filename):
+    script_dir = os.path.dirname(os.path.abspath(__file__)) 
+    config_path = os.path.join(script_dir, filename)
+    with open(config_path, "r") as f:
+        config_param = yaml.safe_load(f)
+    return config_param
 
 
 def main():
@@ -54,14 +62,10 @@ def main():
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("rakuten_final_model")
 
-    #input_example = X_train_tfidf.iloc[:1]
-    #signature = infer_signature(X_train_tfidf, model.predict(X_train_tfidf))
-
-    #input_example = X_train_tfidf[:1].toarray()
-    #prediction_example = model.predict(input_example)
-    #signature = infer_signature(input_example, prediction_example)
     
     # 3.2 training
+
+    config_param = load_config("param_config.yml")
 
     with mlflow.start_run() as run:
         # Get run ID for later model comparison
@@ -76,17 +80,15 @@ def main():
         with open(class_report_path, "w") as f:
             f.write(report)
         
-        mlflow.log_param("loss", "log_loss")
-        mlflow.log_param("alpha", 1.1616550847757421e-06)
-        mlflow.log_param("max_iter", 1000)
+        mlflow.log_param("loss", config_param["model"]["params"]["loss"])
+        mlflow.log_param("alpha", config_param["model"]["params"]["alpha"])
+        mlflow.log_param("max_iter", config_param["model"]["params"]["max_iter"])
 
         mlflow.log_metric("f1_weighted", f1_weighted)
 
         mlflow.sklearn.log_model(model, 
                                  artifact_path="model", 
                                  registered_model_name="SGDClassifier_Model"
-                                 #signature=signature,
-                                 #input_example=input_example
                                  )
         mlflow.log_artifact(class_report_path)
 
