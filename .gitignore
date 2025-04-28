@@ -21,3 +21,4 @@ __pycache__/
 /model.joblibenv
 env
 venv
+my_env
