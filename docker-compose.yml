@@ -60,6 +60,22 @@ services:
     env_file:
       - .env
     command: ["python", "run_model_validation.py"]
+
+  tests:
+    build:
+      context: . 
+      dockerfile: dockerfiles/tests/Dockerfile
+    volumes:
+      - "./shared_volume/data:/app/data"
+      - "./shared_volume/models:/app/models"
+    env_file:
+      - .env
+    depends_on:
+      model_validation:
+        condition: service_completed_successfully
+      dvc-sync:
+        condition: service_completed_successfully
+    command: ["pytest", "plugins/cd4ml/tests/test_inference.py", "-v", "-rA"]
   
   inference:
     build:
