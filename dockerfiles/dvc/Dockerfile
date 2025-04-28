@@ -11,9 +11,5 @@ RUN pip install --upgrade pip
 # install dvc with s3 support
 RUN pip install dvc[s3]
 
-## compy requirements.txt and install dependencies
-# COPY requirements.txt .
-# RUN pip install -r requirements.txt
-
 # pull the data from s3
 CMD ["dvc", "pull"]
