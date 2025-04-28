@@ -14,6 +14,10 @@ import mlflow
 from mlflow.tracking import MlflowClient
 
 
+# --- Path Variables ---
+MODEL_DIR = os.getenv("MODEL_DIR")
+TFIDF_VECTORIZER_PATH = os.path.join(MODEL_DIR, os.getenv("TFIDF_VECTORIZER"))
+PRODUCT_DICTIONARY_PATH = os.path.join(MODEL_DIR, os.getenv("PRODUCT_DICTIONARY"))
 
 # --- JWT Configuration ---
 SECRET_KEY = "your_secret_key_here"
@@ -127,8 +131,8 @@ class ProductTypePredictorMLflow:
 predictor = ProductTypePredictorMLflow(
     #model=latest_model,
     model=production_model,
-    vectorizer_path="data/processed/tfidf_vectorizer.pkl",
-    product_dictionary_path = "models/product_dictionary.pkl"
+    vectorizer_path = TFIDF_VECTORIZER_PATH,
+    product_dictionary_path = PRODUCT_DICTIONARY_PATH
 )
 
 
