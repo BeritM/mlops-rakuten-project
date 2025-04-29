@@ -13,7 +13,8 @@ RUN apt-get update \
 COPY dockerfiles/inference/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# COPY . .
+COPY plugins/cd4ml/inference /app/plugins/cd4ml/inference
 
 # Download NLTK stopwords
 RUN python -m nltk.downloader stopwords

@@ -7,9 +7,10 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 COPY dockerfiles/model_validation/requirements-model.txt .  
-RUN pip install --no-cache-dir -r requirements-model.txt
+RUN pip install --no-cache-dir -r requirements-model.txt \
+    && pip install --no-cache-dir dvc[s3]  #### Max ####
 
-COPY plugins/cd4ml/model_validation /app/plugins/cd4ml/model_validation
+# COPY plugins/cd4ml/model_validation /app/plugins/cd4ml/model_validation
 
 ENV MODEL_OUTPUT_DIR=/app/models
 ENV DATA_INPUT_DIR=/app/data/processed
