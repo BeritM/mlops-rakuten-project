@@ -6,13 +6,12 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from nltk.corpus import stopwords
 from jose import JWTError, jwt
-from typing import Dict
+from typing import Dict, Optional 
 from hashlib import sha256
 from datetime import datetime, timedelta
 import os
 import mlflow
 from mlflow.tracking import MlflowClient
-
 
 
 # --- JWT Configuration ---
@@ -123,14 +122,27 @@ class ProductTypePredictorMLflow:
         prediction = self.product_dictionary[int(prediction)]
         return prediction
 
+#### Max ####
+# Module-wide instantiation removed and predictor variable declared
+predictor: Optional[ProductTypePredictorMLflow] = None  # CHANGED
 
-predictor = ProductTypePredictorMLflow(
-    #model=latest_model,
-    model=production_model,
-    vectorizer_path="data/processed/tfidf_vectorizer.pkl",
-    product_dictionary_path = "models/product_dictionary.pkl"
-)
-
+# Max: Startup hook for loading the predictor
+@app.on_event("startup") 
+def load_predictor():  
+    """Loads the real Predictor only when the FastAPI server is started."""
+    global predictor  
+    vec_path = os.getenv("VECTORIZER_PATH", "data/processed/tfidf_vectorizer.pkl") 
+    dict_path = os.getenv("PRODUCT_DICT_PATH", "models/product_dictionary.pkl") 
+    try:  
+        predictor = ProductTypePredictorMLflow(
+            model=production_model,  
+            vectorizer_path=vec_path, 
+            product_dictionary_path=dict_path 
+        )  
+        print(f" Predictor geladen: {vec_path}")  
+    except FileNotFoundError as e: 
+        print(f" Predictor nicht geladen: {e}") 
+#### Max ####
 
 # --- Authentication Endpoints ---
 @app.post("/login")
