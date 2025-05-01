@@ -38,29 +38,42 @@ import sys
 import os
 import pandas as pd
 
-# Append project root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-
 #from cd4ml.data_processing import load_combined_data, clean_text, split_dataset, apply_tfidf
 from step01_combine_xy import load_combined_data
 from step02_text_cleaning import clean_text
 from step03_split_data import split_dataset
 from step04_tfidf_transform import apply_tfidf
 
+# Load path environment variables from .env
+RAW_DIR = os.getenv("DATA_RAW_DIR")
+PROC_DIR = os.getenv("DATA_PROCESSED_DIR")
+MODEL_DIR = os.getenv("MODEL_DIR")
+X_RAW_PATH = os.path.join(RAW_DIR, os.getenv("X_RAW"))
+Y_RAW_PATH = os.path.join(RAW_DIR, os.getenv("Y_RAW"))
+X_Y_RAW_PATH = os.path.join(RAW_DIR, os.getenv("X_Y_RAW"))
+X_TRAIN_TFIDF_PATH = os.path.join(PROC_DIR, os.getenv("X_TRAIN_TFIDF"))
+X_VALIDATE_TFIDF_PATH = os.path.join(PROC_DIR, os.getenv("X_VALIDATE_TFIDF"))
+X_TEST_TFIDF_PATH = os.path.join(PROC_DIR, os.getenv("X_TEST_TFIDF"))
+TFIDF_VECTORIZER_PATH = os.path.join(MODEL_DIR, os.getenv("TFIDF_VECTORIZER"))
+Y_TRAIN_PATH = os.path.join(PROC_DIR, os.getenv("Y_TRAIN"))
+Y_VALIDATE_PATH = os.path.join(PROC_DIR, os.getenv("Y_VALIDATE"))
+Y_TEST_PATH = os.path.join(PROC_DIR, os.getenv("Y_TEST"))
+
+
 def main():
-    # Set directory paths for raw and processed data
-    raw_dir = "/data/raw"
-    #raw_dir = "../../../data/raw"
-    proc_dir = "/data/processed"
-    #proc_dir = "../../../data/processed"
-    os.makedirs(proc_dir, exist_ok=True)
+    print("Raw data directory:", RAW_DIR)
+    print("Processed data directory:", PROC_DIR)
+    
+    os.makedirs(PROC_DIR, exist_ok=True)
     
     # 1. Load combined data from separate CSV files and combine them
     df = load_combined_data(
-        f"{raw_dir}/X_train_update.csv",
-        f"{raw_dir}/Y_train_CVw08PX.csv",
-        save_path=f"{raw_dir}/raw_x_y.csv"
+        x_path=X_RAW_PATH,
+        y_path=Y_RAW_PATH,
+        save_path=X_Y_RAW_PATH
     )
+
+    print(df.head())
 
     # 2. Clean text using the 'description' column
     if "description" not in df.columns:
@@ -76,10 +89,14 @@ def main():
 
     # 4. TF-IDF Transformation on text data using separate datasets
     tfidf_paths = {
-        "train": f"{proc_dir}/X_train_tfidf.pkl",
-        "validate": f"{proc_dir}/X_validate_tfidf.pkl",
-        "test": f"{proc_dir}/X_test_tfidf.pkl",
-        "vectorizer": f"{proc_dir}/tfidf_vectorizer.pkl"
+        "train": X_TRAIN_TFIDF_PATH,
+        "validate":  X_VALIDATE_TFIDF_PATH,
+        "test": X_TEST_TFIDF_PATH,
+        "vectorizer": TFIDF_VECTORIZER_PATH
+        #"train": f"{PROC_DIR}/X_train_tfidf.pkl",
+        #"validate": f"{PROC_DIR}/X_validate_tfidf.pkl",
+        #"test": f"{PROC_DIR}/X_test_tfidf.pkl",
+        #"vectorizer": f"{PROC_DIR}/tfidf_vectorizer.pkl"
     }
     X_train_tfidf, X_validate_tfidf, X_test_tfidf, vectorizer = apply_tfidf(
         X_train["cleaned_text"],
@@ -97,12 +114,15 @@ def main():
         "y_validate": y_validate,
         "y_test": y_test
     }.items():
-        df_item.to_csv(f"{proc_dir}/{name}.csv", index=False)
+        df_item.to_csv(f"{PROC_DIR}/{name}.csv", index=False)
 
     # Save y_train and y_validate as a pickle file
-    y_train.to_pickle(f"{proc_dir}/y_train.pkl")
-    y_validate.to_pickle(f"{proc_dir}/y_validate.pkl")
-    y_test.to_pickle(f"{proc_dir}/y_test.pkl")
+    y_train.to_pickle(Y_TRAIN_PATH)
+    y_validate.to_pickle(Y_VALIDATE_PATH)
+    y_test.to_pickle(Y_TEST_PATH)
+    #y_train.to_pickle(f"{PROC_DIR}/y_train.pkl")
+    #y_validate.to_pickle(f"{PROC_DIR}/y_validate.pkl")
+    #y_test.to_pickle(f"{PROC_DIR}/y_test.pkl")
 
 
     # Summary output

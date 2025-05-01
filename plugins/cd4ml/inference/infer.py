@@ -14,6 +14,11 @@ import mlflow
 from mlflow.tracking import MlflowClient
 
 
+# --- Path Variables ---
+MODEL_DIR = os.getenv("MODEL_DIR")
+TFIDF_VECTORIZER_PATH = os.path.join(MODEL_DIR, os.getenv("TFIDF_VECTORIZER"))
+PRODUCT_DICTIONARY_PATH = os.path.join(MODEL_DIR, os.getenv("PRODUCT_DICTIONARY"))
+
 # --- JWT Configuration ---
 SECRET_KEY = "your_secret_key_here"
 ALGORITHM = "HS256"
@@ -131,17 +136,15 @@ predictor: Optional[ProductTypePredictorMLflow] = None  # CHANGED
 def load_predictor():  
     """Loads the real Predictor only when the FastAPI server is started."""
     global predictor  
-    vec_path = os.getenv("VECTORIZER_PATH", "data/processed/tfidf_vectorizer.pkl") 
-    dict_path = os.getenv("PRODUCT_DICT_PATH", "models/product_dictionary.pkl") 
     try:  
         predictor = ProductTypePredictorMLflow(
             model=production_model,  
-            vectorizer_path=vec_path, 
-            product_dictionary_path=dict_path 
+            vectorizer_path=TFIDF_VECTORIZER_PATH, 
+            product_dictionary_path=PRODUCT_DICTIONARY_PATH 
         )  
-        print(f" Predictor geladen: {vec_path}")  
+        print(f" Predictor loaded: {TFIDF_VECTORIZER_PATH}")  
     except FileNotFoundError as e: 
-        print(f" Predictor nicht geladen: {e}") 
+        print(f" Predictor loading failed: {e}") 
 #### Max ####
 
 # --- Authentication Endpoints ---

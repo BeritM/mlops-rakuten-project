@@ -18,6 +18,7 @@ __pycache__/
 .git/
 .gitignore
 .gitkeep
+git-workflow.md
 
 # Logfiles & Temp
 *.log
@@ -33,3 +34,21 @@ Thumbs.db
 
 # Exclude pydoc in data_processing folder
 plugins/cd4ml/data_processing/preprocessing_pydoc.py
+
+# Exclude Makefile and associated files
+Makefile
+pyproject.toml
+
+# DVC files
+#dvc.yaml
+READ_ME_FOR_DVC.md
+.dvcignore
+
+# folders
+notebooks
+models
+logs
+docs
+data
+dags
+

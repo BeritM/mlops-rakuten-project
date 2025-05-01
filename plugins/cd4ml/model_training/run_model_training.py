@@ -5,6 +5,7 @@ import mlflow
 import mlflow.sklearn
 from mlflow.models.signature import infer_signature
 from sklearn.metrics import f1_score, classification_report
+import yaml
 
 #import dagshub env variables
 
@@ -13,30 +14,37 @@ DAGSHUB_USER_TOKEN = os.getenv("DAGSHUB_USER_TOKEN")
 DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_REPO_OWNER")
 DAGSHUB_REPO_NAME = os.getenv("DAGSHUB_REPO_NAME")
 
-# Set paths for X and y data and output model folder
+# Load environment variables for files
 
-input_dir = os.getenv("DATA_INPUT_DIR", "app/data/processed")
-output_dir = os.getenv("MODEL_OUTPUT_DIR", "app/models")
-X_train_tfidf_path = os.path.join(input_dir, "X_train_tfidf.pkl")
-y_train_path = os.path.join(input_dir, "y_train.pkl")
-X_validate_tfidf_path = os.path.join(input_dir, "X_validate_tfidf.pkl")
-y_validate_path = os.path.join(input_dir, "y_validate.pkl")
-class_report_path = os.path.join(output_dir, "training_class_report.txt")
-model_path = f"{output_dir}/sgd_text_model.pkl"
+INPUT_DIR = os.getenv("DATA_PROCESSED_DIR")
+OUTPUT_DIR = os.getenv("MODEL_DIR")
+X_TRAIN_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_TRAIN_TFIDF"))
+Y_TRAIN_PATH = os.path.join(INPUT_DIR, os.getenv("Y_TRAIN"))
+X_VALIDATE_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_VALIDATE_TFIDF"))
+Y_VALIDATE_PATH = os.path.join(INPUT_DIR, os.getenv("Y_VALIDATE"))
+MODEL_PATH = os.path.join(OUTPUT_DIR, os.getenv("MODEL"))
+class_report_path = os.path.join(OUTPUT_DIR, "training_class_report.txt")
 
+# Load config file:
+def load_config(filename):
+    script_dir = os.path.dirname(os.path.abspath(__file__)) 
+    config_path = os.path.join(script_dir, filename)
+    with open(config_path, "r") as f:
+        config_param = yaml.safe_load(f)
+    return config_param
 
 
 def main():
         
-    print(f"Loading X_train_tfidf from {X_train_tfidf_path}")
-    print(f"Loading y_train from {y_train_path}")
-    print(f"Loading X_validate_tfidf from {X_validate_tfidf_path}")
-    print(f"Loading y_validate from {y_validate_path}")
+    print(f"Loading X_train_tfidf from {X_TRAIN_TFIDF_PATH}")
+    print(f"Loading y_train from {Y_TRAIN_PATH}")
+    print(f"Loading X_validate_tfidf from {X_VALIDATE_TFIDF_PATH}")
+    print(f"Loading y_validate from {Y_VALIDATE_PATH}")
 
     # 1. Load preprocessed data
 
-    X_train_tfidf, y_train = load_train_data(X_train_tfidf_path, y_train_path)
-    X_validate_tfidf, y_validate = load_train_data(X_validate_tfidf_path, y_validate_path)
+    X_train_tfidf, y_train = load_train_data(X_TRAIN_TFIDF_PATH, Y_TRAIN_PATH)
+    X_validate_tfidf, y_validate = load_train_data(X_VALIDATE_TFIDF_PATH, Y_VALIDATE_PATH)
 
     print("Data loading successful")
 
@@ -54,14 +62,10 @@ def main():
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment("rakuten_final_model")
 
-    #input_example = X_train_tfidf.iloc[:1]
-    #signature = infer_signature(X_train_tfidf, model.predict(X_train_tfidf))
-
-    #input_example = X_train_tfidf[:1].toarray()
-    #prediction_example = model.predict(input_example)
-    #signature = infer_signature(input_example, prediction_example)
     
     # 3.2 training
+
+    config_param = load_config("param_config.yml")
 
     with mlflow.start_run() as run:
         # Get run ID for later model comparison
@@ -76,21 +80,19 @@ def main():
         with open(class_report_path, "w") as f:
             f.write(report)
         
-        mlflow.log_param("loss", "log_loss")
-        mlflow.log_param("alpha", 1.1616550847757421e-06)
-        mlflow.log_param("max_iter", 1000)
+        mlflow.log_param("loss", config_param["model"]["params"]["loss"])
+        mlflow.log_param("alpha", config_param["model"]["params"]["alpha"])
+        mlflow.log_param("max_iter", config_param["model"]["params"]["max_iter"])
 
         mlflow.log_metric("f1_weighted", f1_weighted)
 
         mlflow.sklearn.log_model(model, 
                                  artifact_path="model", 
                                  registered_model_name="SGDClassifier_Model"
-                                 #signature=signature,
-                                 #input_example=input_example
                                  )
         mlflow.log_artifact(class_report_path)
 
-        with open(f"{output_dir}/current_run_id.txt", "w") as f:
+        with open(f"{OUTPUT_DIR}/current_run_id.txt", "w") as f:
             f.write(run_id)
         
     
@@ -100,9 +102,9 @@ def main():
 
     # 4. Save trained model
     
-    joblib.dump(model, model_path)
+    joblib.dump(model, MODEL_PATH)
 
-    print(f"Model saved in {model_path}")
+    print(f"Model saved in {MODEL_PATH}")
 
 
 if __name__ == "__main__":

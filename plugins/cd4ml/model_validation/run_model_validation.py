@@ -6,18 +6,16 @@ from mlflow.tracking import MlflowClient
 from model_validation import load_model, prediction_and_metrics, save_txt_file
 from model_training import load_train_data
 
-# Set paths for X and y data and output model folder
+# Load path environment variables
 
-input_dir = os.getenv("DATA_INPUT_DIR", "./data/processed")
-output_dir = os.getenv("MODEL_OUTPUT_DIR", "./models")
+INPUT_DIR = os.getenv("DATA_PROCESSED_DIR")
+OUTPUT_DIR = os.getenv("MODEL_DIR")
 
-# Change to test after test run!!!
-X_test_tfidf_path = os.path.join(input_dir, "X_test_tfidf.pkl")
-y_test_path = os.path.join(input_dir, "y_test.pkl")
-model_file = "sgd_text_model.pkl"
+X_TEST_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_TEST_TFIDF"))
+Y_TEST_PATH = os.path.join(INPUT_DIR, os.getenv("Y_TEST"))
+MODEL_FILE = os.getenv("MODEL")
 
 #import dagshub env variables
-
 DAGSHUB_USER_NAME = os.getenv("DAGSHUB_USER_NAME")
 DAGSHUB_USER_TOKEN = os.getenv("DAGSHUB_USER_TOKEN")
 DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_REPO_OWNER")
@@ -44,7 +42,7 @@ def main():
     else:
         prod_f1 = None
 
-    with open(f"{output_dir}/current_run_id.txt", "r") as f:
+    with open(f"{OUTPUT_DIR}/current_run_id.txt", "r") as f:
         new_run_id = f.read()
 
     # Neccessary if validation f1 scoring is tracked in MLFlow:
@@ -54,9 +52,9 @@ def main():
 
     # Loading new model and calculate f1 on test set
     
-    model = load_model(output_dir, model_file)
+    model = load_model(OUTPUT_DIR, MODEL_FILE)
 
-    X_validate_tfidf, y_validate = load_train_data(X_test_tfidf_path, y_test_path)
+    X_validate_tfidf, y_validate = load_train_data(X_TEST_TFIDF_PATH, Y_TEST_PATH)
 
     val_acc, val_f1, classification_repo = prediction_and_metrics(X_validate_tfidf, y_validate, model)
 
@@ -65,35 +63,11 @@ def main():
     print(f"Validation F1: {val_f1}")
     print(f"classification report: \n {classification_repo}")
 
-    save_txt_file(output_dir, f"classification_report_{model_file}", classification_repo)
+    save_txt_file(OUTPUT_DIR, f"classification_report_{MODEL_FILE}", classification_repo)
 
     print("Classification report saved successfully")
 
-    # Compare latest model in production with new model
-
-    #if prod_f1 is None or val_f1 > prod_f1:
-    #    # Get new model version
-    #    model_versions = client.search_model_versions("name='SGDClassifier_Model'")
-    #    new_version = None
-    #    for mv in model_versions:
-    #        if mv.run_id == new_run_id:
-    #            new_version = mv.version
-    #            break
-        
-    #    if new_version is None:
-    #        raise ValueError(f"No model version found for run_id {new_run_id}.")
-
-    #    # Put new model in production stage
-    #    client.transition_model_version_stage(
-    #        name="SGDClassifier_Model",
-    #        version=new_version,
-    #        stage="Production"
-    #    )
-    #    print(f"Model version {new_version} in production.")
-    #else:
-    #    print("Last production model performs better.")
-
-
+    
     # Get model versions registered under 'SGDClassifier_Model'
     model_versions = client.search_model_versions(f"name='SGDClassifier_Model'")
 
@@ -109,9 +83,9 @@ def main():
         prod_run = client.get_run(prod_model.run_id)
         prod_f1 = prod_run.data.metrics.get("f1_weighted")
 
-    # Vergleich der neuen mit der aktuellen Production-Version
+    # Compares old model with latest model
     if prod_f1 is None or val_f1 > prod_f1:
-        # Suche neue Version passend zur run_id
+        # Search for new model by run_id
         new_version = None
         for mv in model_versions:
             if mv.run_id == new_run_id:
@@ -121,7 +95,7 @@ def main():
         if new_version is None:
             raise ValueError(f"No model version found for run_id {new_run_id}.")
 
-        # Setze Alias 'production' auf die neue Version
+        # Put alias 'production' on new model
         client.set_registered_model_alias(
             name="SGDClassifier_Model",
             alias="production",
