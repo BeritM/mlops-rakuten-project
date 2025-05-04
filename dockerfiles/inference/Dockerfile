@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Make the whole project importable (especially plugins.cd4ml.*)
+ENV PYTHONPATH="${PYTHONPATH}:/app"
+
 # Download NLTK stopwords
 RUN python -m nltk.downloader stopwords
 
