@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r requirements-model.txt
 
 COPY plugins/cd4ml/model_validation /app/plugins/cd4ml/model_validation
 
+ENV PYTHONPATH="${PYTHONPATH}:/app"
 ENV MODEL_OUTPUT_DIR=/app/models
 ENV DATA_INPUT_DIR=/app/data/processed
 

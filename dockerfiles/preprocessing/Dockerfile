@@ -18,6 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all project files into the container
 COPY . .
 
+ENV PYTHONPATH="${PYTHONPATH}:/app"
+
 # Download NLTK data during build so tokenizers and wordlists are ready at runtime – this is best practice because it ensures a deterministic, offline-capable image and faster container startup.
 RUN python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('wordnet')"
 
