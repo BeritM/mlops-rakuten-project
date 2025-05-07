@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all project files into the container
 COPY . .
 
+# Set PYTHONPATH for possibility to use other scripts
 ENV PYTHONPATH="${PYTHONPATH}:/app"
 
 # Download NLTK data during build so tokenizers and wordlists are ready at runtime – this is best practice because it ensures a deterministic, offline-capable image and faster container startup.

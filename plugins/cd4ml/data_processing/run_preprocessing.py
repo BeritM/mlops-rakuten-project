@@ -38,11 +38,14 @@ import sys
 import os
 import pandas as pd
 
-#from cd4ml.data_processing import load_combined_data, clean_text, split_dataset, apply_tfidf
 from step01_combine_xy import load_combined_data
-from step02_text_cleaning import clean_text
+#from step02_text_cleaning import clean_text
 from step03_split_data import split_dataset
 from step04_tfidf_transform import apply_tfidf
+from plugins.cd4ml.data_preprocessing_core.preprocessing_core import ProductTypePredictorMLflow # replaces step02_text_cleaning
+
+#from dotenv import load_dotenv
+#load_dotenv()
 
 # Load path environment variables from .env
 RAW_DIR = os.getenv("DATA_RAW_DIR")
@@ -65,6 +68,7 @@ def main():
     print("Processed data directory:", PROC_DIR)
     
     os.makedirs(PROC_DIR, exist_ok=True)
+    os.makedirs(MODEL_DIR, exist_ok=True)
     
     # 1. Load combined data from separate CSV files and combine them
     df = load_combined_data(
@@ -78,7 +82,7 @@ def main():
     # 2. Clean text using the 'description' column
     if "description" not in df.columns:
         raise KeyError("description not found.")
-    df["cleaned_text"] = df["description"].astype(str).apply(clean_text)
+    df["cleaned_text"] = df["description"].astype(str).apply(ProductTypePredictorMLflow.clean_text_static)
 
     # 3. Train/Validate/Test Split
     if "prdtypecode" not in df.columns:
@@ -93,10 +97,6 @@ def main():
         "validate":  X_VALIDATE_TFIDF_PATH,
         "test": X_TEST_TFIDF_PATH,
         "vectorizer": TFIDF_VECTORIZER_PATH
-        #"train": f"{PROC_DIR}/X_train_tfidf.pkl",
-        #"validate": f"{PROC_DIR}/X_validate_tfidf.pkl",
-        #"test": f"{PROC_DIR}/X_test_tfidf.pkl",
-        #"vectorizer": f"{PROC_DIR}/tfidf_vectorizer.pkl"
     }
     X_train_tfidf, X_validate_tfidf, X_test_tfidf, vectorizer = apply_tfidf(
         X_train["cleaned_text"],
@@ -120,9 +120,6 @@ def main():
     y_train.to_pickle(Y_TRAIN_PATH)
     y_validate.to_pickle(Y_VALIDATE_PATH)
     y_test.to_pickle(Y_TEST_PATH)
-    #y_train.to_pickle(f"{PROC_DIR}/y_train.pkl")
-    #y_validate.to_pickle(f"{PROC_DIR}/y_validate.pkl")
-    #y_test.to_pickle(f"{PROC_DIR}/y_test.pkl")
 
 
     # Summary output
