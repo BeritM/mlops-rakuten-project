@@ -3,6 +3,7 @@ import joblib
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+import pandas as pd
 
 STOP_WORDS = set(stopwords.words("english")) | \
              set(stopwords.words("french")) | \
@@ -24,7 +25,7 @@ class ProductTypePredictorMLflow:
 
     def preprocess(self, text):
         cleaned = self.clean_text_static(text)
-        return self.vectorizer.transform([cleaned])
+        return self.vectorizer_transform(pd.Series([cleaned]), self.vectorizer)
 
     def predict(self, designation, description=""):
         if not isinstance(designation, str):
@@ -33,7 +34,7 @@ class ProductTypePredictorMLflow:
             raise ValueError("description has to be a string.")
         
         combined_text = f"{designation} {description}"
-        vectorized = self.preprocess(combined_text)
+        vectorized = self.preprocess_series(combined_text)
         prediction = self.model.predict(vectorized)[0]
         return self.product_dictionary[int(prediction)]
 
@@ -52,4 +53,11 @@ class ProductTypePredictorMLflow:
         filtered_tokens = [token for token in lemmas if token not in STOP_WORDS]
         # Returns the cleaned text as a string
         return " ".join(filtered_tokens)
+    
+    @staticmethod
+    def vectorizer_transform(series, vectorizer):
+        """Only vectorization, no text cleaning"""
+        if not isinstance(series, pd.Series):
+            raise ValueError("series has to be a pandas Series.")
+        return vectorizer.transform(series)
     

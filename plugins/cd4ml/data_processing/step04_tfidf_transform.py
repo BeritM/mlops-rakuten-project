@@ -1,5 +1,6 @@
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
+from plugins.cd4ml.data_preprocessing_core.preprocessing_core import ProductTypePredictorMLflow
 import pickle
 
 def apply_tfidf(
@@ -47,8 +48,11 @@ def apply_tfidf(
     X_train_tfidf = vectorizer.fit_transform(train_series)
     
     # Transform the validation and test data.
-    X_validate_tfidf = vectorizer.transform(validate_series)
-    X_test_tfidf = vectorizer.transform(test_series)
+    #def vectorizer_transform(series):
+    #    return vectorizer.transform(series)
+    
+    X_validate_tfidf = ProductTypePredictorMLflow.vectorizer_transform(validate_series, vectorizer)
+    X_test_tfidf = ProductTypePredictorMLflow.vectorizer_transform(test_series, vectorizer)
     
     # Optionally save the TF-IDF matrices to files if save_paths is provided.
     if save_paths is not None:

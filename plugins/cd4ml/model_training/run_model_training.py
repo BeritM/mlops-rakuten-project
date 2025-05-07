@@ -25,6 +25,9 @@ Y_VALIDATE_PATH = os.path.join(INPUT_DIR, os.getenv("Y_VALIDATE"))
 MODEL_PATH = os.path.join(OUTPUT_DIR, os.getenv("MODEL"))
 class_report_path = os.path.join(OUTPUT_DIR, "training_class_report.txt")
 
+# Create folder /models
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 # Load config file:
 def load_config(filename):
     script_dir = os.path.dirname(os.path.abspath(__file__)) 
