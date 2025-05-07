@@ -42,7 +42,7 @@ from step01_combine_xy import load_combined_data
 #from step02_text_cleaning import clean_text
 from step03_split_data import split_dataset
 from step04_tfidf_transform import apply_tfidf
-from plugins.cd4ml.data_preprocessing_core.preprocessing_core import ProductTypePredictorMLflow # replaces step02_text_cleaning
+from plugins.cd4ml.data_processing.preprocessing_core import ProductTypePredictorMLflow # replaces step02_text_cleaning
 
 #from dotenv import load_dotenv
 #load_dotenv()

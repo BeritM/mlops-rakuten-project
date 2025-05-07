@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from plugins.cd4ml.data_preprocessing_core.preprocessing_core import ProductTypePredictorMLflow
+from plugins.cd4ml.data_processing.preprocessing_core import ProductTypePredictorMLflow
 import pickle
 
 def apply_tfidf(

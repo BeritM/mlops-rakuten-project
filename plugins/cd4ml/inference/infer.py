@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import os
 import mlflow
 from mlflow.tracking import MlflowClient
-from plugins.cd4ml.data_preprocessing_core.preprocessing_core import ProductTypePredictorMLflow
+from plugins.cd4ml.data_processing.preprocessing_core import ProductTypePredictorMLflow
 
 
 # --- Path Variables ---
