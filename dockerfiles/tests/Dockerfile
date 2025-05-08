@@ -13,7 +13,7 @@ COPY dockerfiles/tests/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # NLTK-Stopwords
-RUN python -m nltk.downloader stopwords
+RUN python -m nltk.downloader punkt stopwords punkt_tab wordnet
 
 # Code rein, shared_volume kopieren
 COPY . .

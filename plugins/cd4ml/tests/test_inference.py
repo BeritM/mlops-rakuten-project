@@ -36,9 +36,13 @@ from plugins.cd4ml.inference.infer import ProductTypePredictorMLflow as ProductT
 # ---------------------------------------------------
 # Pfade zu den realen Artefakten
 # ---------------------------------------------------
-VECTOR_PATH       = os.path.join("data", "processed", "tfidf_vectorizer.pkl")
-MODEL_PATH        = os.path.join("models", "sgd_text_model.pkl")
-PRODUCT_DICT_PATH = os.path.join("models", "product_dictionary.pkl")
+#VECTOR_PATH       = os.path.join("data", "processed", "tfidf_vectorizer.pkl")
+#MODEL_PATH        = os.path.join("models", "sgd_text_model.pkl")
+#PRODUCT_DICT_PATH = os.path.join("models", "product_dictionary.pkl")
+
+VECTOR_PATH = os.path.join(os.getenv("MODEL_DIR"), os.getenv("TFIDF_VECTORIZER"))
+MODEL_PATH = os.path.join(os.getenv("MODEL_DIR"), os.getenv("MODEL"))
+PRODUCT_DICT_PATH = os.path.join(os.getenv("MODEL_DIR"), os.getenv("PRODUCT_DICTIONARY"))
 
 # ---------------------------------------------------
 # Fixtures

@@ -34,7 +34,7 @@ class ProductTypePredictorMLflow:
             raise ValueError("description has to be a string.")
         
         combined_text = f"{designation} {description}"
-        vectorized = self.preprocess_series(combined_text)
+        vectorized = self.preprocess(combined_text)
         prediction = self.model.predict(vectorized)[0]
         return self.product_dictionary[int(prediction)]
 
