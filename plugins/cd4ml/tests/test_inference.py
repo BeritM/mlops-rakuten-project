@@ -1,40 +1,18 @@
 import os
-from dotenv import load_dotenv
-
-# Projekt‑Root ermitteln
-PROJECT_ROOT = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..", "..")
-)
-# .env laden
-load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
-
-# Danach erst das MLflow‑Mocking usw.
 import sys
-import types
 import pytest
-import numpy as np
 import joblib
-
-# ---------------------------------------------------
-# Wechsel ins shared_volume als CWD
-# ---------------------------------------------------
-SHARED_DIR = os.path.join(PROJECT_ROOT, "shared_volume")
-os.chdir(SHARED_DIR)
-
-# ---------------------------------------------------
-# Sys.path anpassen
-# ---------------------------------------------------
-sys.path.insert(0, PROJECT_ROOT)
-
-# ---------------------------------------------------
-# Echte Importe (jetzt mit geladenen ENV‑Variablen)
-# ---------------------------------------------------
 from fastapi.testclient import TestClient
-import plugins.cd4ml.inference.infer as infer_mod
+
+# Make sure the project root (/app) is on the import path
+sys.path.insert(0, os.getcwd())
+
+# Import the FastAPI app and predictor class
 from plugins.cd4ml.inference.infer import ProductTypePredictorMLflow as ProductTypePredictor, app
+import plugins.cd4ml.inference.infer as infer_mod
 
 # ---------------------------------------------------
-# Pfade zu den realen Artefakten
+# # Determine data/model directories from environment
 # ---------------------------------------------------
 #VECTOR_PATH       = os.path.join("data", "processed", "tfidf_vectorizer.pkl")
 #MODEL_PATH        = os.path.join("models", "sgd_text_model.pkl")
@@ -44,33 +22,25 @@ VECTOR_PATH = os.path.join(os.getenv("MODEL_DIR"), os.getenv("TFIDF_VECTORIZER")
 MODEL_PATH = os.path.join(os.getenv("MODEL_DIR"), os.getenv("MODEL"))
 PRODUCT_DICT_PATH = os.path.join(os.getenv("MODEL_DIR"), os.getenv("PRODUCT_DICTIONARY"))
 
-# ---------------------------------------------------
-# Fixtures
-# ---------------------------------------------------
 @pytest.fixture(scope="module")
 def predictor():
-    for p in (VECTOR_PATH, MODEL_PATH, PRODUCT_DICT_PATH):
-        if not os.path.exists(p):
-            pytest.skip(f"Required file not found: {p}")
+    # Skip tests if artifacts are missing
+    for path in (VECTOR_PATH, MODEL_PATH, PRODUCT_DICT_PATH):
+        if not os.path.exists(path):
+            pytest.skip(f"Required artifact not found: {path}")
     model = joblib.load(MODEL_PATH)
     return ProductTypePredictor(
         model=model,
         vectorizer_path=VECTOR_PATH,
-        product_dictionary_path=PRODUCT_DICT_PATH
+        product_dictionary_path=PRODUCT_DICT_PATH,
     )
 
 @pytest.fixture(scope="module")
 def client():
     return TestClient(app)
 
-# ---------------------------------------------------
-# 7) Unit-Tests für den Predictor
-# ---------------------------------------------------
 def test_predictor_real_data(predictor):
-    designation = "Test product"
-    description = "This is a description"
-    result = predictor.predict(designation, description)
-    assert result is not None
+    result = predictor.predict("Test product", "This is a description")
     assert isinstance(result, str)
 
 def test_predictor_empty_inputs(predictor):
@@ -88,31 +58,27 @@ def test_predictor_invalid_input(predictor):
 def test_predictor_special_characters(predictor):
     assert predictor.predict("Test!@#", "Desc???") is not None
 
-
-# ---------------------------------------------------
-# 7) Integrationstest für /predict
-# ---------------------------------------------------
 def test_fastapi_endpoint(client, predictor):
-    # Ersetze globalen Predictor, damit infer.py nicht seinen eigenen lädt
+    # Replace the global predictor in the inference module
     infer_mod.predictor = predictor
 
-    # Login
+    # Perform login
     login_resp = client.post(
         "/login",
         data={"username": "admin", "password": "admin123"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"}
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     assert login_resp.status_code == 200
-
     token = login_resp.json()["access_token"]
-    # Predict‑Call
+
+    # Call the /predict endpoint
     resp = client.post(
         "/predict",
         json={"designation": "Test", "description": "Desc"},
         params={"token": token},
-        headers={"Content-Type": "application/json"}
+        headers={"Content-Type": "application/json"},
     )
     assert resp.status_code == 200
-    data = resp.json()
-    assert "predicted_class" in resp.json()
-    print("Raw /predict response JSON:", data)
+    json_data = resp.json()
+    assert "predicted_class" in json_data
+    print("Raw /predict response JSON:", json_data)

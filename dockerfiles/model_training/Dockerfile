@@ -10,11 +10,13 @@ RUN apt-get update \
 
 # Copy & install Python dependencies 
 COPY dockerfiles/model_training/requirements-model.txt ./requirements-model.txt
-RUN pip install --no-cache-dir -r requirements-model.txt
+RUN pip install --no-cache-dir -r requirements-model.txt \
+    && pip install --no-cache-dir dvc[s3]  
+#### Max ####
 
 # Copy model_training plugin code
 COPY . .
-#COPY plugins/cd4ml/model_training /app/plugins/cd4ml/model_training
+
 
 ENV MODEL_OUTPUT_DIR=/app/models
 ENV DATA_INPUT_DIR=/app/data/processed
