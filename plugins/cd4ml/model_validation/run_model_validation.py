@@ -4,7 +4,7 @@ import mlflow
 from mlflow.tracking import MlflowClient
 
 from model_validation import load_model, prediction_and_metrics, save_txt_file
-from model_training import load_train_data
+from plugins.cd4ml.model_training.model_training import load_train_data
 
 # Load path environment variables
 

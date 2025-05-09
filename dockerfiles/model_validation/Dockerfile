@@ -9,7 +9,11 @@ RUN apt-get update \
 COPY dockerfiles/model_validation/requirements-model.txt .  
 RUN pip install --no-cache-dir -r requirements-model.txt
 
-COPY plugins/cd4ml/model_validation /app/plugins/cd4ml/model_validation
+COPY . .
+#COPY plugins/cd4ml/model_validation /app/plugins/cd4ml/model_validation
+
+# Set PYTHONPATH for possibility to use other scripts
+ENV PYTHONPATH="${PYTHONPATH}:/app"
 
 ENV MODEL_OUTPUT_DIR=/app/models
 ENV DATA_INPUT_DIR=/app/data/processed
