@@ -1,10 +1,10 @@
 services:
   dvc-sync:
     build:
-      context: ./dockerfiles/dvc
-      dockerfile: Dockerfile
+      context: "./dockerfiles/dvc"
+      dockerfile: "Dockerfile"
     volumes:
-      - .:/workspace
+      - ./:/workspace
       - dvc-cache:/workspace/.dvc/cache
     working_dir: /workspace
     environment:
@@ -15,8 +15,8 @@ services:
     command: ["dvc", "pull", "--force"]
   auth_service:
     build:
-      context: .
-      dockerfile: dockerfiles/auth_service/Dockerfile
+      context: "."
+      dockerfile: "dockerfiles/auth_service/Dockerfile"
     env_file:
       - .env
     ports:
@@ -30,8 +30,8 @@ services:
 
   predict_service:
     build:
-      context: .
-      dockerfile: dockerfiles/predict_service/Dockerfile
+      context: "."
+      dockerfile: "dockerfiles/predict_service/Dockerfile"
     env_file:
       - .env
     ports:
