@@ -5,7 +5,7 @@ import re
 import mlflow
 from datetime import datetime
 from typing import Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Header
 from pydantic import BaseModel
 from jose import jwt, JWTError
 from mlflow.tracking import MlflowClient
@@ -19,7 +19,7 @@ SECRET_KEY = "your_secret_key_here"
 ALGORITHM = "HS256"
 
 # --- Auth Helper ---
-def verify_token(token: str):
+def verify_token(token: str = Header(...)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
@@ -28,6 +28,19 @@ def verify_token(token: str):
         return payload
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+#def verify_token(authorization: str = Header(...)):
+#    try:
+#        scheme, token = authorization.split()
+#        if scheme.lower() != "bearer":
+#            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid auth scheme")
+#        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+#        username = payload.get("sub")
+#        if username is None:
+#            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+#        return payload
+#    except (JWTError, ValueError):
+#        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token format")
 
 # --- Models ---
 class PredictionRequest(BaseModel):
