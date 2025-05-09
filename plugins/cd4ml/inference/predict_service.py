@@ -9,7 +9,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from pydantic import BaseModel
 from jose import jwt, JWTError
 from mlflow.tracking import MlflowClient
-from plugins.cd4ml.data_preprocessing_core.preprocessing_core import ProductTypePredictorMLflow
+from plugins.cd4ml.data_processing.preprocessing_core import ProductTypePredictorMLflow
 
 # --- FastAPI Setup ---
 predict_app = FastAPI()
