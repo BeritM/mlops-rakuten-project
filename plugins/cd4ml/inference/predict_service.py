@@ -51,9 +51,9 @@ class PredictionResponse(BaseModel):
     predicted_class: str
 
 # --- Path Variables ---
-MODEL_DIR = os.getenv("MODEL_DIR")
-TFIDF_VECTORIZER_PATH = os.path.join(MODEL_DIR, os.getenv("TFIDF_VECTORIZER"))
-PRODUCT_DICTIONARY_PATH = os.path.join(MODEL_DIR, os.getenv("PRODUCT_DICTIONARY"))
+#MODEL_DIR = os.getenv("MODEL_DIR")
+#TFIDF_VECTORIZER_PATH = os.path.join(MODEL_DIR, os.getenv("TFIDF_VECTORIZER"))
+#PRODUCT_DICTIONARY_PATH = os.path.join(MODEL_DIR, os.getenv("PRODUCT_DICTIONARY"))
 
 DAGSHUB_USER_NAME = os.getenv("DAGSHUB_USER_NAME")
 DAGSHUB_USER_TOKEN = os.getenv("DAGSHUB_USER_TOKEN")
@@ -69,9 +69,16 @@ model_uri = f"models:/{model_name}@production"
 production_model = mlflow.pyfunc.load_model(model_uri=model_uri)
 client = MlflowClient()
 prod_model_version = client.get_model_version_by_alias(model_name, "production")
-run_info = client.get_run(prod_model_version.run_id)
+run_id = prod_model_version.run_id
+run_info = client.get_run(run_id)
 model_params = run_info.data.params
 model_metrics = run_info.data.metrics
+
+# --- Load TFIDF Vectorizer and Product Dictionary ---
+vectorizer_path_dir = client.download_artifacts(run_id=run_id, path="vectorizer")
+vectorizer_path = os.path.join(vectorizer_path_dir, "tfidf_vectorizer.pkl")
+product_dict_dir = client.download_artifacts(run_id=run_id, path="product_dictionary")
+product_dictionary_path = os.path.join(product_dict_dir, "product_dictionary.pkl")
 
 predictor: Optional[ProductTypePredictorMLflow] = None
 
@@ -80,8 +87,8 @@ def load_predictor():
     global predictor
     predictor = ProductTypePredictorMLflow(
         model=production_model,
-        vectorizer_path=TFIDF_VECTORIZER_PATH,
-        product_dictionary_path=PRODUCT_DICTIONARY_PATH
+        vectorizer_path=vectorizer_path,
+        product_dictionary_path=product_dictionary_path
     )
 
 @predict_app.post("/predict", response_model=PredictionResponse)

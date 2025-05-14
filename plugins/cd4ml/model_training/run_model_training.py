@@ -23,7 +23,9 @@ Y_TRAIN_PATH = os.path.join(INPUT_DIR, os.getenv("Y_TRAIN"))
 X_VALIDATE_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_VALIDATE_TFIDF"))
 Y_VALIDATE_PATH = os.path.join(INPUT_DIR, os.getenv("Y_VALIDATE"))
 MODEL_PATH = os.path.join(OUTPUT_DIR, os.getenv("MODEL"))
-class_report_path = os.path.join(OUTPUT_DIR, "training_class_report.txt")
+CLASS_REPORT_PATH = os.path.join(OUTPUT_DIR, "training_class_report.txt")
+VECTORIZER_PATH = os.path.join(OUTPUT_DIR, os.getenv("TFIDF_VECTORIZER"))
+PRODUCT_DICTIONARY_PATH = os.path.join(OUTPUT_DIR, os.getenv("PRODUCT_DICTIONARY"))
 
 # Create folder /models
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -80,7 +82,7 @@ def main():
         f1_weighted = f1_score(y_validate, y_pred, average="weighted")
 
         report = classification_report(y_validate, y_pred)
-        with open(class_report_path, "w") as f:
+        with open(CLASS_REPORT_PATH, "w") as f:
             f.write(report)
         
         mlflow.log_param("loss", config_param["model"]["params"]["loss"])
@@ -93,7 +95,9 @@ def main():
                                  artifact_path="model", 
                                  registered_model_name="SGDClassifier_Model"
                                  )
-        mlflow.log_artifact(class_report_path)
+        mlflow.log_artifact(CLASS_REPORT_PATH, artifact_path="classification_report")
+        mlflow.log_artifact(VECTORIZER_PATH, artifact_path="vectorizer")
+        mlflow.log_artifact(PRODUCT_DICTIONARY_PATH, artifact_path="product_dictionary")
 
         with open(f"{OUTPUT_DIR}/current_run_id.txt", "w") as f:
             f.write(run_id)
