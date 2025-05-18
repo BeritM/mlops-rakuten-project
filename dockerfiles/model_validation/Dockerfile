@@ -6,8 +6,9 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends git \
  && rm -rf /var/lib/apt/lists/*
 
-COPY dockerfiles/model_validation/requirements-model.txt .  
+COPY dockerfiles/model_validation/requirements-model.txt ./requirements-model.txt
 RUN pip install --no-cache-dir -r requirements-model.txt
+RUN pip install --no-cache-dir "dvc[s3]"      # CHANGED
 
 COPY plugins/cd4ml/model_validation /app/plugins/cd4ml/model_validation
 

@@ -4,70 +4,82 @@ services:
       context: ./dockerfiles/dvc
       dockerfile: Dockerfile
     volumes:
-      - .:/workspace
-      - dvc-cache:/workspace/.dvc/cache
-    working_dir: /workspace
+      - .:/app                       # CHANGED
+      - dvc-cache:/app/.dvc/cache    # CHANGED
+    working_dir: /app                # CHANGED
     environment:
-  # Authentification
-      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN} 
+      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
     command: ["dvc", "pull", "--force"]
-    # command: ["dvc", "pull"]
+
   preprocessing:
     build:
       context: .
       dockerfile: dockerfiles/preprocessing/Dockerfile
     volumes:
+      - .:/app                       # CHANGED
+      - dvc-cache:/app/.dvc/cache    # CHANGED
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
+    working_dir: /app                # CHANGED
+    env_file:
+      - .env
     depends_on:
       dvc-sync:
         condition: service_completed_successfully
-    env_file:
-      - .env
-    command: ["python", "plugins/cd4ml/data_processing/run_preprocessing.py"]
-
+    command: >
+      sh -c "python plugins/cd4ml/data_processing/run_preprocessing.py && dvc push"
 
   model_training:
     build:
       context: .
       dockerfile: dockerfiles/model_training/Dockerfile
     volumes:
+      - .:/app                       # CHANGED
+      - dvc-cache:/app/.dvc/cache    # CHANGED
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
-    depends_on:
-      preprocessing:
-        condition: service_completed_successfully
+    working_dir: /app                # CHANGED
     env_file:
       - .env
     environment:
       - MODEL_OUTPUT_DIR=/app/models
       - DATA_INPUT_DIR=/app/data/processed
-    command: ["python", "plugins/cd4ml/model_training/run_model_training.py"]
-
+    depends_on:
+      preprocessing:
+        condition: service_completed_successfully
+    command: >
+      sh -c "python plugins/cd4ml/model_training/run_model_training.py && dvc push"
 
   model_validation:
     build:
       context: .
       dockerfile: dockerfiles/model_validation/Dockerfile
     volumes:
+      - .:/app                       # CHANGED
+      - dvc-cache:/app/.dvc/cache    # CHANGED
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
+    working_dir: /app                # CHANGED
+    env_file:
+      - .env
     depends_on:
       model_training:
         condition: service_completed_successfully
-    env_file:
-      - .env
-    command: ["python", "plugins/cd4ml/model_validation/run_model_validation.py"]
+    command: >
+      sh -c "python plugins/cd4ml/model_validation/run_model_validation.py && dvc push"
 
   tests:
     build:
-      context: . 
+      context: .
       dockerfile: dockerfiles/tests/Dockerfile
     volumes:
+      - .:/app                       # CHANGED
+      - dvc-cache:/app/.dvc/cache    # CHANGED
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
+    working_dir: /app                # CHANGED
     env_file:
       - .env
     depends_on:
@@ -75,8 +87,9 @@ services:
         condition: service_completed_successfully
       dvc-sync:
         condition: service_completed_successfully
-    command: ["pytest", "plugins/cd4ml/tests/test_inference.py", "-v", "-rA"]
-  
+    command: >
+      sh -c "pytest plugins/cd4ml/tests/test_inference.py -v -rA && dvc push"
+
   inference:
     build:
       context: .
@@ -84,16 +97,19 @@ services:
     ports:
       - "8000:8000"
     volumes:
+      - .:/app                      
       - "./shared_volume/data:/app/data"
       - "./shared_volume/models:/app/models"
-      - dvc-cache:/workspace/.dvc/cache
+      - dvc-cache:/app/.dvc/cache    # CHANGED
+    working_dir: /app
+    env_file:
+      - .env
     depends_on:
       model_validation:
         condition: service_completed_successfully
       dvc-sync:
         condition: service_completed_successfully
-    env_file:
-      - .env
     command: ["uvicorn", "plugins.cd4ml.inference.infer:app", "--host", "0.0.0.0", "--port", "8000"]
+
 volumes:
   dvc-cache:

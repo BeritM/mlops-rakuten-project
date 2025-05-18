@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip
 
+# Install DVC CLI so that "dvc push" is available
+RUN pip install --no-cache-dir "dvc[s3]"      # CHANGED
 
 # Copy requirements.txt
 COPY dockerfiles/preprocessing/requirements.txt .
@@ -20,7 +22,6 @@ COPY . .
 
 # Download NLTK data during build so tokenizers and wordlists are ready at runtime – this is best practice because it ensures a deterministic, offline-capable image and faster container startup.
 RUN python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('wordnet')"
-
 
 # Set the command to run the preprocessing script when the container starts
 CMD ["python", "plugins/cd4ml/data_processing/run_preprocessing.py"]
