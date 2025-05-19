@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git \
 # Copy & install requirements
 COPY dockerfiles/tests/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir "dvc[s3]"      # CHANGED
+# RUN pip install --no-cache-dir "dvc[s3]"      # CHANGED
 
 # NLTK-Stopwords
 RUN python -m nltk.downloader stopwords
