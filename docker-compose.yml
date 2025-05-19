@@ -88,7 +88,7 @@ services:
       dvc-sync:
         condition: service_completed_successfully
     command: >
-      sh -c "pytest plugins/cd4ml/tests/test_inference.py -v -rA && dvc push"
+      sh -c "dvc pull --force && pytest plugins/cd4ml/tests/test_inference.py -v -rA && dvc push"
 
   inference:
     build:
