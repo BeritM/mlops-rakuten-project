@@ -1,0 +1,6 @@
+outs:
+- md5: d86e3137ad6ecd8498306da4d6b9b43b.dir
+  size: 206
+  nfiles: 1
+  hash: md5
+  path: feedback

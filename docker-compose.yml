@@ -128,6 +128,8 @@ services:
       - .:/app
       - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
       - dvc-cache:/app/.dvc/cache
+      - ./shared_volume/data:/app/data
+      - ./shared_volume/models:/app/models
     working_dir: /app
     depends_on:
       auth_service:
