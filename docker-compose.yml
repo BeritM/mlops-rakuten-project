@@ -20,8 +20,8 @@ services:
     volumes:
       - .:/app                       # CHANGED
       - dvc-cache:/app/.dvc/cache    # CHANGED
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
+      - ./shared_volume/data:/app/data
+      - ./shared_volume/models:/app/models
     working_dir: /app                # CHANGED
     env_file:
       - .env
@@ -38,8 +38,8 @@ services:
     volumes:
       - .:/app                       # CHANGED
       - dvc-cache:/app/.dvc/cache    # CHANGED
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
+      - ./shared_volume/data:/app/data
+      - ./shared_volume/models:/app/models
     working_dir: /app                # CHANGED
     env_file:
       - .env
@@ -59,8 +59,8 @@ services:
     volumes:
       - .:/app                       # CHANGED
       - dvc-cache:/app/.dvc/cache    # CHANGED
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
+      - ./shared_volume/data:/app/data
+      - ./shared_volume/models:/app/models
     working_dir: /app                # CHANGED
     env_file:
       - .env
