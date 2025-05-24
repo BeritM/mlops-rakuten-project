@@ -59,17 +59,74 @@ Y_TRAIN_PATH          = os.path.join(PROC_DIR, os.getenv("Y_TRAIN"))
 Y_VALIDATE_PATH       = os.path.join(PROC_DIR, os.getenv("Y_VALIDATE"))
 Y_TEST_PATH           = os.path.join(PROC_DIR, os.getenv("Y_TEST"))
 
-#### max ####
-def dvc_track_and_commit(paths):
+import os
+import subprocess
+
+def track_and_push(paths, description: str):
     """
-    Track given dirs relative to /app and stage .dvc files.
+    Für jeden Pfad in `paths` (absolute Container-Pfad, z.B. "/app/data/processed" oder "/app/models"):
+      0. Git-Credentials mit Token einrichten
+      1. 'dvc add --force shared_volume/<relpath>'
+      2. git add shared_volume/<relpath>.dvc
+    Anschließend git commit & git push.
     """
-    cwd = os.getcwd()  # /app
-    rels = [os.path.relpath(p, cwd) for p in paths]
-    for rp in rels:
-        subprocess.run(["dvc", "add", "--force", rp], check=True, text=True)
-    subprocess.run(["git", "add"] + [f"{rp}.dvc" for rp in rels], check=True, text=True)
-#### max ####
+    cwd = os.getcwd()
+
+    # 0) Git-Credentials mit Token einrichten
+    github_token = os.getenv("GITHUB_TOKEN")
+    owner        = os.getenv("GITHUB_REPO_OWNER")
+    repo         = os.getenv("GITHUB_REPO_NAME")
+
+    # A) ~/.git-credentials anlegen
+    cred_file = os.path.expanduser("~/.git-credentials")
+    os.makedirs(os.path.dirname(cred_file), exist_ok=True)
+    with open(cred_file, "w") as fh:
+        fh.write(f"https://{github_token}@github.com\n")
+
+    # B) Store-Helper aktivieren
+    subprocess.run(
+        ["git", "config", "--global", "credential.helper", "store"],
+        check=True, text=True
+    )
+
+    # C) Remote-URL so setzen, dass Git das Credentials-File nutzt
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", f"https://github.com/{owner}/{repo}.git"],
+        check=True, text=True
+    )
+
+    dvc_files = []
+    for p in paths:
+        # z.B. p="/app/data/processed"  → rel="data/processed"
+        rel = os.path.relpath(p, cwd)
+        shared_rel = os.path.join("shared_volume", rel)
+
+        # 1) Tracken (Meta-Datei landet unter shared_volume/…)
+        subprocess.run(
+            ["dvc", "add", "--force", shared_rel],
+            check=True, text=True
+        )
+
+        # 2) Git-Stage der automatisch erzeugten .dvc-Datei
+        dvc_file = f"{shared_rel}.dvc"
+        subprocess.run(
+            ["git", "add", dvc_file],
+            check=True, text=True
+        )
+        dvc_files.append(dvc_file)
+
+    # 3) Commit & Push
+    subprocess.run(
+        ["git", "commit", "-m", f"dvc: {description}"],
+        check=True, text=True
+    )
+    subprocess.run(
+        ["git", "push"],
+        check=True, text=True
+    )
+
+    print(f"Tracked & committed: {', '.join(dvc_files)}")
+
 
 def main():
     print("Raw data directory:", RAW_DIR)
@@ -133,6 +190,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #max# now track the processed folder; 
-    #     this creates /app/data/processed.dvc → host/shared_volume/data/processed.dvc
-    dvc_track_and_commit([PROC_DIR])
+    track_and_push([PROC_DIR], "track processed data")

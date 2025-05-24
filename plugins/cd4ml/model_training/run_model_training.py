@@ -24,35 +24,60 @@ Y_VALIDATE_PATH       = os.path.join(INPUT_DIR,  os.getenv("Y_VALIDATE"))
 MODEL_PATH            = os.path.join(OUTPUT_DIR, os.getenv("MODEL"))
 class_report_path     = os.path.join(OUTPUT_DIR, "training_class_report.txt")
 
+import os
+import subprocess
+
+import os
+import subprocess
+
+def track_and_push(paths, description: str):
+    """
+    Für jeden Pfad in `paths` (absolute Container-Pfad, z.B. "/app/data/processed" oder "/app/models"):
+      1. Erzeuge den zu trackenden Pfad unter shared_volume
+      2. 'dvc add --force shared_volume/<relpath>'
+      3. git add shared_volume/<relpath>.dvc
+    Anschließend git commit & git push.
+    """
+    cwd = os.getcwd()
+
+    dvc_files = []
+    for p in paths:
+        # z.B. p="/app/data/processed"  → rel="data/processed"
+        rel = os.path.relpath(p, cwd)
+        # das ist der bereits per Compose gemountete Host-Ordner:
+        shared_rel = os.path.join("shared_volume", rel)
+
+        # 1) Tracken (Meta-Datei landet unter shared_volume/...)
+        subprocess.run(
+            ["dvc", "add", "--force", shared_rel],
+            check=True, text=True
+        )
+
+        # 2) Git-Stage der automatisch erzeugten .dvc-Datei
+        dvc_file = f"{shared_rel}.dvc"
+        subprocess.run(
+            ["git", "add", dvc_file],
+            check=True, text=True
+        )
+        dvc_files.append(dvc_file)
+
+    # 3) Commit & Push
+    subprocess.run(
+        ["git", "commit", "-m", f"dvc: {description}"],
+        check=True, text=True
+    )
+    subprocess.run(
+        ["git", "push"],
+        check=True, text=True
+    )
+
+    print(f"Tracked & committed: {', '.join(dvc_files)}")
+
+    
 def load_config(filename):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     with open(os.path.join(script_dir, filename), "r") as fh:
         return yaml.safe_load(fh)
-
-#### max ####
-def dvc_track_and_commit_shared_model():
-    """
-    Track shared_volume/models dir and stage its .dvc file.
-    """
-    # we want 'shared_volume/models' → shared_volume/models.dvc
-    subprocess.run(
-        ["dvc", "add", "--force", "models"],  # /app/models
-        check=True, text=True
-    )
-    subprocess.run(
-        ["git", "add", "models.dvc"],         # root-level models.dvc
-        check=True, text=True
-    )
-    # move it into shared_volume
-    subprocess.run(
-        ["mv", "models.dvc", "shared_volume/models.dvc"],
-        check=True, text=True
-    )
-    subprocess.run(
-        ["git", "add", "shared_volume/models.dvc"],
-        check=True, text=True
-    )
-#### max ####
 
 def main():
     print(f"Loading X_train_tfidf from {X_TRAIN_TFIDF_PATH}")
@@ -111,5 +136,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #max# produce shared_volume/models.dvc
-    dvc_track_and_commit_shared_model()
+    track_and_push([OUTPUT_DIR], "track trained model")

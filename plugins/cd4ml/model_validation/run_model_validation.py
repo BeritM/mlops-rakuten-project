@@ -2,7 +2,7 @@ import sys
 import os
 import mlflow
 from mlflow.tracking import MlflowClient
-import subprocess                                #max#
+import subprocess          
 
 from model_validation import load_model, prediction_and_metrics, save_txt_file
 from model_training import load_train_data
@@ -20,16 +20,52 @@ DAGSHUB_USER_TOKEN = os.getenv("DAGSHUB_USER_TOKEN")
 DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_REPO_OWNER")
 DAGSHUB_REPO_NAME  = os.getenv("DAGSHUB_REPO_NAME")
 
-#### max ####
-def dvc_track_and_commit_shared_model():
+import os
+import subprocess
+
+def track_and_push(paths, description: str):
     """
-    Re-track shared_volume/models and stage its .dvc file.
+    Für jeden Pfad in `paths` (absolute Container-Pfad, z.B. "/app/data/processed" oder "/app/models"):
+      1. Erzeuge den zu trackenden Pfad unter shared_volume
+      2. 'dvc add --force shared_volume/<relpath>'
+      3. git add shared_volume/<relpath>.dvc
+    Anschließend git commit & git push.
     """
-    subprocess.run(["dvc", "add", "--force", "models"], check=True, text=True)
-    subprocess.run(["git", "add", "models.dvc"], check=True, text=True)
-    subprocess.run(["mv", "models.dvc", "shared_volume/models.dvc"], check=True, text=True)
-    subprocess.run(["git", "add", "shared_volume/models.dvc"], check=True, text=True)
-#### max ####
+    cwd = os.getcwd()
+
+    dvc_files = []
+    for p in paths:
+        # z.B. p="/app/data/processed"  → rel="data/processed"
+        rel = os.path.relpath(p, cwd)
+        # das ist der bereits per Compose gemountete Host-Ordner:
+        shared_rel = os.path.join("shared_volume", rel)
+
+        # 1) Tracken (Meta-Datei landet unter shared_volume/...)
+        subprocess.run(
+            ["dvc", "add", "--force", shared_rel],
+            check=True, text=True
+        )
+
+        # 2) Git-Stage der automatisch erzeugten .dvc-Datei
+        dvc_file = f"{shared_rel}.dvc"
+        subprocess.run(
+            ["git", "add", dvc_file],
+            check=True, text=True
+        )
+        dvc_files.append(dvc_file)
+
+    # 3) Commit & Push
+    subprocess.run(
+        ["git", "commit", "-m", f"dvc: {description}"],
+        check=True, text=True
+    )
+    subprocess.run(
+        ["git", "push"],
+        check=True, text=True
+    )
+
+    print(f"Tracked & committed: {', '.join(dvc_files)}")
+
 
 def main():
     # 1. MLflow connection
@@ -80,5 +116,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #max# update shared_volume/models.dvc after validation
-    dvc_track_and_commit_shared_model()
+    track_and_push([OUTPUT_DIR], "track validated model")
