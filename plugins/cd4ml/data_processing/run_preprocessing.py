@@ -37,7 +37,10 @@ All steps are executed in sequence, ensuring that the raw data is processed and 
 import sys
 import os
 import pandas as pd
-import subprocess                         
+from pathlib import Path
+
+# Import the improved DVC push manager
+from dvc_push_manager import track_and_push_with_retry
 
 from step01_combine_xy import load_combined_data
 from step02_text_cleaning import clean_text
@@ -59,135 +62,141 @@ Y_TRAIN_PATH          = os.path.join(PROC_DIR, os.getenv("Y_TRAIN"))
 Y_VALIDATE_PATH       = os.path.join(PROC_DIR, os.getenv("Y_VALIDATE"))
 Y_TEST_PATH           = os.path.join(PROC_DIR, os.getenv("Y_TEST"))
 
-import os
-import subprocess
-
-def track_and_push(paths, description: str):
-    """
-    Für jeden Pfad in `paths` (absolute Container-Pfad, z.B. "/app/data/processed" oder "/app/models"):
-      0. Git-Credentials mit Token einrichten
-      1. 'dvc add --force shared_volume/<relpath>'
-      2. git add shared_volume/<relpath>.dvc
-    Anschließend git commit & git push.
-    """
-    cwd = os.getcwd()
-
-    # 0) Git-Credentials mit Token einrichten
-    github_token = os.getenv("GITHUB_TOKEN")
-    owner        = os.getenv("GITHUB_REPO_OWNER")
-    repo         = os.getenv("GITHUB_REPO_NAME")
-
-    # A) ~/.git-credentials anlegen
-    cred_file = os.path.expanduser("~/.git-credentials")
-    os.makedirs(os.path.dirname(cred_file), exist_ok=True)
-    with open(cred_file, "w") as fh:
-        fh.write(f"https://{github_token}@github.com\n")
-
-    # B) Store-Helper aktivieren
-    subprocess.run(
-        ["git", "config", "--global", "credential.helper", "store"],
-        check=True, text=True
-    )
-
-    # C) Remote-URL so setzen, dass Git das Credentials-File nutzt
-    subprocess.run(
-        ["git", "remote", "set-url", "origin", f"https://github.com/{owner}/{repo}.git"],
-        check=True, text=True
-    )
-
-    dvc_files = []
-    for p in paths:
-        # z.B. p="/app/data/processed"  → rel="data/processed"
-        rel = os.path.relpath(p, cwd)
-        shared_rel = os.path.join("shared_volume", rel)
-
-        # 1) Tracken (Meta-Datei landet unter shared_volume/…)
-        subprocess.run(
-            ["dvc", "add", "--force", shared_rel],
-            check=True, text=True
-        )
-
-        # 2) Git-Stage der automatisch erzeugten .dvc-Datei
-        dvc_file = f"{shared_rel}.dvc"
-        subprocess.run(
-            ["git", "add", dvc_file],
-            check=True, text=True
-        )
-        dvc_files.append(dvc_file)
-
-    # 3) Commit & Push
-    subprocess.run(
-        ["git", "commit", "-m", f"dvc: {description}"],
-        check=True, text=True
-    )
-    subprocess.run(
-        ["git", "push"],
-        check=True, text=True
-    )
-
-    print(f"Tracked & committed: {', '.join(dvc_files)}")
-
+def validate_environment():
+    """Validate that all required environment variables are set."""
+    required_vars = [
+        "DATA_RAW_DIR", "DATA_PROCESSED_DIR", "MODEL_DIR",
+        "X_RAW", "Y_RAW", "X_Y_RAW",
+        "X_TRAIN_TFIDF", "X_VALIDATE_TFIDF", "X_TEST_TFIDF",
+        "TFIDF_VECTORIZER", "Y_TRAIN", "Y_VALIDATE", "Y_TEST"
+    ]
+    
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    if missing_vars:
+        raise ValueError(f"Missing required environment variables: {missing_vars}")
+    
+    # Create directories if they don't exist
+    for directory in [RAW_DIR, PROC_DIR, MODEL_DIR]:
+        os.makedirs(directory, exist_ok=True)
+        print(f"Ensured directory exists: {directory}")
 
 def main():
-    print("Raw data directory:", RAW_DIR)
-    print("Processed data directory:", PROC_DIR)
-    os.makedirs(PROC_DIR, exist_ok=True)
+    print("=" * 60)
+    print("STARTING PREPROCESSING PIPELINE")
+    print("=" * 60)
+    
+    try:
+        # Validate environment
+        validate_environment()
+        print(f"Raw data directory: {RAW_DIR}")
+        print(f"Processed data directory: {PROC_DIR}")
+        print(f"Model directory: {MODEL_DIR}")
 
-    # 1. Load and combine raw data
-    df = load_combined_data(
-        x_path=X_RAW_PATH,
-        y_path=Y_RAW_PATH,
-        save_path=X_Y_RAW_PATH
-    )
-    print(df.head())
+        # 1. Load and combine raw data
+        print("\n1. Loading and combining raw data...")
+        df = load_combined_data(
+            x_path=X_RAW_PATH,
+            y_path=Y_RAW_PATH,
+            save_path=X_Y_RAW_PATH
+        )
+        print(f"Combined dataset shape: {df.shape}")
+        print("First few rows:")
+        print(df.head())
 
-    # 2. Clean text
-    if "description" not in df.columns:
-        raise KeyError("description not found.")
-    df["cleaned_text"] = df["description"].astype(str).apply(clean_text)
+        # 2. Clean text
+        print("\n2. Cleaning text data...")
+        if "description" not in df.columns:
+            raise KeyError("'description' column not found in dataset")
+        
+        df["cleaned_text"] = df["description"].astype(str).apply(clean_text)
+        print(f"Text cleaning completed. Sample cleaned text: {df['cleaned_text'].iloc[0][:100]}...")
 
-    # 3. Train/Validate/Test Split
-    if "prdtypecode" not in df.columns:
-        raise KeyError("prdtypecode not found.")
-    X_train, X_validate, X_test, y_train, y_validate, y_test = split_dataset(
-        df, target_column="prdtypecode"
-    )
+        # 3. Train/Validate/Test Split
+        print("\n3. Splitting dataset...")
+        if "prdtypecode" not in df.columns:
+            raise KeyError("'prdtypecode' column not found in dataset")
+        
+        X_train, X_validate, X_test, y_train, y_validate, y_test = split_dataset(
+            df, target_column="prdtypecode"
+        )
+        print(f"Training set size: {len(X_train)}")
+        print(f"Validation set size: {len(X_validate)}")
+        print(f"Test set size: {len(X_test)}")
 
-    # 4. TF-IDF Transformation
-    tfidf_paths = {
-        "train":      X_TRAIN_TFIDF_PATH,
-        "validate":   X_VALIDATE_TFIDF_PATH,
-        "test":       X_TEST_TFIDF_PATH,
-        "vectorizer": TFIDF_VECTORIZER_PATH
-    }
-    X_train_tfidf, X_validate_tfidf, X_test_tfidf, vectorizer = apply_tfidf(
-        X_train["cleaned_text"],
-        X_validate["cleaned_text"],
-        X_test["cleaned_text"],
-        save_paths=tfidf_paths
-    )
+        # 4. TF-IDF Transformation
+        print("\n4. Applying TF-IDF transformation...")
+        tfidf_paths = {
+            "train":      X_TRAIN_TFIDF_PATH,
+            "validate":   X_VALIDATE_TFIDF_PATH,
+            "test":       X_TEST_TFIDF_PATH,
+            "vectorizer": TFIDF_VECTORIZER_PATH
+        }
+        
+        X_train_tfidf, X_validate_tfidf, X_test_tfidf, vectorizer = apply_tfidf(
+            X_train["cleaned_text"],
+            X_validate["cleaned_text"],
+            X_test["cleaned_text"],
+            save_paths=tfidf_paths
+        )
+        print(f"TF-IDF transformation completed.")
+        print(f"Training TF-IDF shape: {X_train_tfidf.shape}")
+        print(f"Vocabulary size: {len(vectorizer.vocabulary_)}")
 
-    # 5. Save outputs
-    mapping = {
-        "X_train": X_train,
-        "X_validate": X_validate,
-        "X_test": X_test,
-        "y_train": y_train,
-        "y_validate": y_validate,
-        "y_test": y_test
-    }
-    for name, df_item in mapping.items():
-        df_item.to_csv(f"{PROC_DIR}/{name}.csv", index=False)
+        # 5. Save processed data
+        print("\n5. Saving processed data...")
+        data_mapping = {
+            "X_train": X_train,
+            "X_validate": X_validate,
+            "X_test": X_test,
+            "y_train": y_train,
+            "y_validate": y_validate,
+            "y_test": y_test
+        }
+        
+        for name, df_item in data_mapping.items():
+            csv_path = os.path.join(PROC_DIR, f"{name}.csv")
+            df_item.to_csv(csv_path, index=False)
+            print(f"Saved {name} to {csv_path}")
 
-    y_train.to_pickle(Y_TRAIN_PATH)
-    y_validate.to_pickle(Y_VALIDATE_PATH)
-    y_test.to_pickle(Y_TEST_PATH)
+        # Save target variables as pickle files
+        y_train.to_pickle(Y_TRAIN_PATH)
+        y_validate.to_pickle(Y_VALIDATE_PATH)
+        y_test.to_pickle(Y_TEST_PATH)
+        print("Saved target variables as pickle files")
 
-    # Summary
-    print("Preprocessing finished!")
-    print(f"TF-IDF Shape (Train): {X_train_tfidf.shape}")
-    print(f"Vocabulary size: {len(vectorizer.vocabulary_)}")
+        # Summary
+        print("\n" + "=" * 60)
+        print("PREPROCESSING COMPLETED SUCCESSFULLY!")
+        print("=" * 60)
+        print(f"TF-IDF Shape (Train): {X_train_tfidf.shape}")
+        print(f"TF-IDF Shape (Validate): {X_validate_tfidf.shape}")
+        print(f"TF-IDF Shape (Test): {X_test_tfidf.shape}")
+        print(f"Vocabulary size: {len(vectorizer.vocabulary_)}")
+        print(f"Class distribution in training set:")
+        print(y_train.value_counts().head())
+
+    except Exception as e:
+        print(f"\nERROR in preprocessing pipeline: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
-    track_and_push([PROC_DIR], "track processed data")
+    
+    # Track processed data with DVC
+    print("\n" + "=" * 60)
+    print("TRACKING PROCESSED DATA WITH DVC")
+    print("=" * 60)
+    
+    success = track_and_push_with_retry(
+        description="track processed data after preprocessing", 
+        max_retries=3,
+        force_all=False
+    )
+    
+    if success:
+        print("Successfully tracked and pushed processed data to DVC")
+    else:
+        print("Warning: DVC tracking failed, but preprocessing completed successfully")
+        # Don't exit with error - preprocessing was successful

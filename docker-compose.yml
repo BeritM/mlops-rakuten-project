@@ -25,11 +25,14 @@ services:
     working_dir: /app                # CHANGED
     env_file:
       - .env
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
     depends_on:
       dvc-sync:
         condition: service_completed_successfully
     command: >
-      sh -c "python plugins/cd4ml/data_processing/run_preprocessing.py && dvc push"
+      sh -c "python plugins/cd4ml/data_processing/run_preprocessing.py"
 
   model_training:
     build:
@@ -46,11 +49,13 @@ services:
     environment:
       - MODEL_OUTPUT_DIR=/app/models
       - DATA_INPUT_DIR=/app/data/processed
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
     depends_on:
       preprocessing:
         condition: service_completed_successfully
     command: >
-      sh -c "python plugins/cd4ml/model_training/run_model_training.py && dvc push"
+      sh -c "python plugins/cd4ml/model_training/run_model_training.py"
 
   model_validation:
     build:
@@ -64,11 +69,14 @@ services:
     working_dir: /app                # CHANGED
     env_file:
       - .env
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
     depends_on:
       model_training:
         condition: service_completed_successfully
     command: >
-      sh -c "python plugins/cd4ml/model_validation/run_model_validation.py && dvc push"
+      sh -c "python plugins/cd4ml/model_validation/run_model_validation.py"
 
   tests:
     build:
@@ -77,8 +85,8 @@ services:
     volumes:
       - .:/app                       # CHANGED
       - dvc-cache:/app/.dvc/cache    # CHANGED
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
+      - ./shared_volume/data:/app/data
+      - ./shared_volume/models:/app/models
     working_dir: /app                # CHANGED
     env_file:
       - .env
@@ -98,8 +106,8 @@ services:
       - "8000:8000"
     volumes:
       - .:/app                      
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
+      - ./shared_volume/data:/app/data
+      - ./shared_volume/models:/app/models
       - dvc-cache:/app/.dvc/cache    # CHANGED
     working_dir: /app
     env_file:

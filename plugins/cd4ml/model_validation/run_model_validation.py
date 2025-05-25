@@ -1,8 +1,16 @@
+"""
+run_model_validation.py
+
+Updated version with improved DVC push logic and better error handling.
+"""
+
 import sys
 import os
 import mlflow
 from mlflow.tracking import MlflowClient
-import subprocess          
+
+# Import the improved DVC push manager
+from dvc_push_manager import track_and_push_with_retry
 
 from model_validation import load_model, prediction_and_metrics, save_txt_file
 from model_training import load_train_data
@@ -20,100 +28,253 @@ DAGSHUB_USER_TOKEN = os.getenv("DAGSHUB_USER_TOKEN")
 DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_REPO_OWNER")
 DAGSHUB_REPO_NAME  = os.getenv("DAGSHUB_REPO_NAME")
 
-import os
-import subprocess
+def validate_environment():
+    """Validate that all required environment variables are set."""
+    required_vars = [
+        "DATA_PROCESSED_DIR", "MODEL_DIR", "MODEL",
+        "X_TEST_TFIDF", "Y_TEST",
+        "DAGSHUB_USER_NAME", "DAGSHUB_USER_TOKEN", "DAGSHUB_REPO_OWNER", "DAGSHUB_REPO_NAME"
+    ]
+    
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    if missing_vars:
+        raise ValueError(f"Missing required environment variables: {missing_vars}")
+    
+    print("All required environment variables are set.")
 
-def track_and_push(paths, description: str):
-    """
-    Für jeden Pfad in `paths` (absolute Container-Pfad, z.B. "/app/data/processed" oder "/app/models"):
-      1. Erzeuge den zu trackenden Pfad unter shared_volume
-      2. 'dvc add --force shared_volume/<relpath>'
-      3. git add shared_volume/<relpath>.dvc
-    Anschließend git commit & git push.
-    """
-    cwd = os.getcwd()
+def validate_input_files():
+    """Validate that all required input files exist."""
+    required_files = {
+        "X_test_tfidf": X_TEST_TFIDF_PATH,
+        "y_test": Y_TEST_PATH,
+        "current_run_id": os.path.join(OUTPUT_DIR, "current_run_id.txt")
+    }
+    
+    missing_files = []
+    for name, path in required_files.items():
+        if not os.path.exists(path):
+            missing_files.append(f"{name}: {path}")
+    
+    if missing_files:
+        raise FileNotFoundError(f"Missing required input files:\n" + "\n".join(missing_files))
+    
+    print("All required input files found.")
 
-    dvc_files = []
-    for p in paths:
-        # z.B. p="/app/data/processed"  → rel="data/processed"
-        rel = os.path.relpath(p, cwd)
-        # das ist der bereits per Compose gemountete Host-Ordner:
-        shared_rel = os.path.join("shared_volume", rel)
-
-        # 1) Tracken (Meta-Datei landet unter shared_volume/...)
-        subprocess.run(
-            ["dvc", "add", "--force", shared_rel],
-            check=True, text=True
-        )
-
-        # 2) Git-Stage der automatisch erzeugten .dvc-Datei
-        dvc_file = f"{shared_rel}.dvc"
-        subprocess.run(
-            ["git", "add", dvc_file],
-            check=True, text=True
-        )
-        dvc_files.append(dvc_file)
-
-    # 3) Commit & Push
-    subprocess.run(
-        ["git", "commit", "-m", f"dvc: {description}"],
-        check=True, text=True
-    )
-    subprocess.run(
-        ["git", "push"],
-        check=True, text=True
-    )
-
-    print(f"Tracked & committed: {', '.join(dvc_files)}")
-
-
-def main():
-    # 1. MLflow connection
+def setup_mlflow():
+    """Setup MLflow client and tracking."""
     tracking_uri = (
         f"https://{DAGSHUB_USER_NAME}:{DAGSHUB_USER_TOKEN}"
         f"@dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow"
     )
+    
+    print(f"Setting up MLflow client...")
+    print(f"Tracking URI: https://{DAGSHUB_USER_NAME}:***@dagshub.com/{DAGSHUB_REPO_OWNER}/{DAGSHUB_REPO_NAME}.mlflow")
+    
     mlflow.set_tracking_uri(tracking_uri)
     client = MlflowClient(tracking_uri=tracking_uri)
+    
+    return client, tracking_uri
 
-    # 2. Compare with current production model
-    latest_prod = client.get_latest_versions("SGDClassifier_Model", stages=["Production"])
-    prod_f1 = None
-    if latest_prod:
-        prod_run_id = latest_prod[0].run_id
-        prod_f1 = client.get_run(prod_run_id).data.metrics.get("f1_weighted")
+def get_production_model_performance(client):
+    """Get the performance of the current production model."""
+    try:
+        # Get latest production model
+        latest_prod = client.get_latest_versions("SGDClassifier_Model", stages=["Production"])
+        
+        if not latest_prod:
+            print("No production model found.")
+            return None, None
+        
+        prod_version = latest_prod[0]
+        prod_run_id = prod_version.run_id
+        print(f"Current production model: version {prod_version.version}, run_id: {prod_run_id}")
+        
+        # Get production model performance
+        prod_run = client.get_run(prod_run_id)
+        prod_f1 = prod_run.data.metrics.get("f1_weighted")
+        
+        if prod_f1 is not None:
+            print(f"Production model F1 score: {prod_f1:.4f}")
+        else:
+            print("Production model F1 score not found in metrics")
+        
+        return prod_f1, prod_run_id
+        
+    except Exception as e:
+        print(f"Error retrieving production model: {e}")
+        return None, None
 
-    with open(f"{OUTPUT_DIR}/current_run_id.txt", "r") as fh:
+def get_new_model_run_id():
+    """Get the run ID of the newly trained model."""
+    run_id_path = os.path.join(OUTPUT_DIR, "current_run_id.txt")
+    
+    with open(run_id_path, "r") as fh:
         new_run_id = fh.read().strip()
+    
+    print(f"New model run ID: {new_run_id}")
+    return new_run_id
 
+def validate_and_test_model():
+    """Load and test the newly trained model."""
+    print("Loading newly trained model...")
     model = load_model(OUTPUT_DIR, MODEL_FILE)
+    print(f"Model loaded successfully: {type(model).__name__}")
+    
+    print("Loading test data...")
     X_test_tfidf, y_test = load_train_data(X_TEST_TFIDF_PATH, Y_TEST_PATH)
-
+    print(f"Test data shape: {X_test_tfidf.shape}")
+    print(f"Test labels shape: {y_test.shape}")
+    print(f"Test labels distribution:\n{y_test.value_counts().head()}")
+    
+    print("Running model validation...")
     val_acc, val_f1, classification_repo = prediction_and_metrics(X_test_tfidf, y_test, model)
-
+    
     print(f"Validation accuracy: {val_acc:.4f}")
-    print(f"Validation F1:       {val_f1:.4f}")
+    print(f"Validation F1 (weighted): {val_f1:.4f}")
+    
+    # Save classification report
+    report_filename = f"classification_report_{MODEL_FILE}"
+    report_path = save_txt_file(OUTPUT_DIR, report_filename, classification_repo)
+    print(f"Classification report saved to: {report_path}")
+    
+    return val_acc, val_f1, classification_repo, model
 
-    report_path = os.path.join(OUTPUT_DIR, f"classification_report_{MODEL_FILE}.txt")
-    save_txt_file(OUTPUT_DIR, f"classification_report_{MODEL_FILE}", classification_repo)
-
-    # 3. Promote model if better
-    model_versions = client.search_model_versions("name='SGDClassifier_Model'")
-    new_version = next((mv for mv in model_versions if mv.run_id == new_run_id), None)
-
-    if prod_f1 is None or val_f1 > prod_f1:
+def promote_model_if_better(client, new_run_id, new_f1, prod_f1):
+    """Promote the new model to production if it performs better."""
+    try:
+        # Find the model version corresponding to the new run
+        model_versions = client.search_model_versions("name='SGDClassifier_Model'")
+        new_version = next((mv for mv in model_versions if mv.run_id == new_run_id), None)
+        
         if new_version is None:
             raise ValueError(f"No model version found for run_id {new_run_id}")
-        client.set_registered_model_alias(
-            name="SGDClassifier_Model",
-            alias="production",
-            version=new_version.version
-        )
-        print(f"Model version {new_version.version} is now 'production'.")
-    else:
-        print("Existing production model performs better.")
+        
+        print(f"New model version: {new_version.version}")
+        
+        # Decision logic for promotion
+        should_promote = False
+        promotion_reason = ""
+        
+        if prod_f1 is None:
+            should_promote = True
+            promotion_reason = "No existing production model"
+        elif new_f1 > prod_f1:
+            improvement = ((new_f1 - prod_f1) / prod_f1) * 100
+            should_promote = True
+            promotion_reason = f"Performance improvement: {improvement:.2f}% (F1: {prod_f1:.4f} → {new_f1:.4f})"
+        else:
+            decline = ((prod_f1 - new_f1) / prod_f1) * 100
+            promotion_reason = f"Performance decline: {decline:.2f}% (F1: {prod_f1:.4f} → {new_f1:.4f})"
+        
+        if should_promote:
+            print(f"PROMOTING MODEL: {promotion_reason}")
+            client.set_registered_model_alias(
+                name="SGDClassifier_Model",
+                alias="production",
+                version=new_version.version
+            )
+            print(f"✅ Model version {new_version.version} is now in production.")
+            
+            # Also set it to the "Production" stage for backward compatibility
+            try:
+                client.transition_model_version_stage(
+                    name="SGDClassifier_Model",
+                    version=new_version.version,
+                    stage="Production"
+                )
+                print(f"✅ Model version {new_version.version} transitioned to Production stage.")
+            except Exception as e:
+                print(f"Warning: Could not transition to Production stage: {e}")
+            
+            return True, promotion_reason
+        else:
+            print(f"KEEPING CURRENT MODEL: {promotion_reason}")
+            return False, promotion_reason
+            
+    except Exception as e:
+        print(f"Error during model promotion: {e}")
+        return False, f"Error: {e}"
 
+def main():
+    print("=" * 60)
+    print("STARTING MODEL VALIDATION PIPELINE")
+    print("=" * 60)
+    
+    try:
+        # Validate environment and inputs
+        validate_environment()
+        validate_input_files()
+        
+        print(f"Input directory: {INPUT_DIR}")
+        print(f"Output directory: {OUTPUT_DIR}")
+        print(f"Model file: {MODEL_FILE}")
+
+        # 1. Setup MLflow connection
+        print("\n1. Setting up MLflow connection...")
+        client, tracking_uri = setup_mlflow()
+
+        # 2. Get current production model performance
+        print("\n2. Checking current production model...")
+        prod_f1, prod_run_id = get_production_model_performance(client)
+
+        # 3. Get new model run ID
+        print("\n3. Getting new model information...")
+        new_run_id = get_new_model_run_id()
+
+        # 4. Validate and test the new model
+        print("\n4. Validating new model...")
+        val_acc, val_f1, classification_report, model = validate_and_test_model()
+
+        # 5. Compare and decide on promotion
+        print("\n5. Model promotion decision...")
+        promoted, reason = promote_model_if_better(client, new_run_id, val_f1, prod_f1)
+
+        # 6. Log validation metrics to MLflow
+        print("\n6. Logging validation results to MLflow...")
+        with mlflow.start_run(run_id=new_run_id):
+            mlflow.log_metric("test_accuracy", val_acc)
+            mlflow.log_metric("test_f1_weighted", val_f1)
+            mlflow.log_param("promoted_to_production", promoted)
+            mlflow.log_param("promotion_reason", reason)
+            
+            # Log the test classification report
+            report_path = os.path.join(OUTPUT_DIR, f"classification_report_{MODEL_FILE}.txt")
+            if os.path.exists(report_path):
+                mlflow.log_artifact(report_path, "test_reports")
+
+        # Summary
+        print("\n" + "=" * 60)
+        print("MODEL VALIDATION COMPLETED SUCCESSFULLY!")
+        print("=" * 60)
+        print(f"Test accuracy: {val_acc:.4f}")
+        print(f"Test F1 score (weighted): {val_f1:.4f}")
+        if prod_f1 is not None:
+            print(f"Production F1 score: {prod_f1:.4f}")
+        print(f"Model promoted: {'✅ YES' if promoted else '❌ NO'}")
+        print(f"Reason: {reason}")
+
+    except Exception as e:
+        print(f"\nERROR in model validation pipeline: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
-    track_and_push([OUTPUT_DIR], "track validated model")
+    
+    # Track validation results with DVC
+    print("\n" + "=" * 60)
+    print("TRACKING VALIDATION RESULTS WITH DVC")
+    print("=" * 60)
+    
+    success = track_and_push_with_retry(
+        description="track model validation results and reports", 
+        max_retries=3,
+        force_all=False
+    )
+    
+    if success:
+        print("Successfully tracked and pushed validation results to DVC")
+    else:
+        print("Warning: DVC tracking failed, but model validation completed successfully")
+        # Don't exit with error - validation was successful
