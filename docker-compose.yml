@@ -4,25 +4,24 @@ services:
       context: ./dockerfiles/dvc
       dockerfile: Dockerfile
     volumes:
-      - .:/app                       # CHANGED
-      - dvc-cache:/app/.dvc/cache    # CHANGED
-    working_dir: /app                # CHANGED
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+    working_dir: /app
     environment:
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
     command: ["dvc", "pull", "--force"]
-
+  
   preprocessing:
     build:
       context: .
       dockerfile: dockerfiles/preprocessing/Dockerfile
     volumes:
-      - .:/app                       # CHANGED
-      - dvc-cache:/app/.dvc/cache    # CHANGED
-      - ./shared_volume/data:/app/data
-      - ./shared_volume/models:/app/models
-    working_dir: /app                # CHANGED
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+    working_dir: /app
     env_file:
       - .env
     environment:
@@ -36,61 +35,62 @@ services:
         condition: service_completed_successfully
     command: >
       sh -c "python plugins/cd4ml/data_processing/run_preprocessing.py"
-
+  
   model_training:
     build:
       context: .
       dockerfile: dockerfiles/model_training/Dockerfile
     volumes:
-      - .:/app                       # CHANGED
-      - dvc-cache:/app/.dvc/cache    # CHANGED
-      - ./shared_volume/data:/app/data
-      - ./shared_volume/models:/app/models
-    working_dir: /app                # CHANGED
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+    working_dir: /app
     env_file:
       - .env
     environment:
-      - MODEL_OUTPUT_DIR=/app/models
-      - DATA_INPUT_DIR=/app/data/processed
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
     depends_on:
       preprocessing:
         condition: service_completed_successfully
     command: >
       sh -c "python plugins/cd4ml/model_training/run_model_training.py"
-
+  
   model_validation:
     build:
       context: .
       dockerfile: dockerfiles/model_validation/Dockerfile
     volumes:
-      - .:/app                       # CHANGED
-      - dvc-cache:/app/.dvc/cache    # CHANGED
-      - ./shared_volume/data:/app/data
-      - ./shared_volume/models:/app/models
-    working_dir: /app                # CHANGED
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+    working_dir: /app
     env_file:
       - .env
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
     depends_on:
       model_training:
         condition: service_completed_successfully
     command: >
       sh -c "python plugins/cd4ml/model_validation/run_model_validation.py"
-
+  
   tests:
     build:
       context: .
       dockerfile: dockerfiles/tests/Dockerfile
     volumes:
-      - .:/app                       # CHANGED
-      - dvc-cache:/app/.dvc/cache    # CHANGED
-      - ./shared_volume/data:/app/data
-      - ./shared_volume/models:/app/models
-    working_dir: /app                # CHANGED
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+    working_dir: /app
     env_file:
       - .env
     depends_on:
@@ -100,7 +100,7 @@ services:
         condition: service_completed_successfully
     command: >
       sh -c "dvc pull --force && pytest plugins/cd4ml/tests/test_inference.py -v -rA && dvc push"
-
+  
   inference:
     build:
       context: .
@@ -108,10 +108,9 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app                      
-      - ./shared_volume/data:/app/data
-      - ./shared_volume/models:/app/models
-      - dvc-cache:/app/.dvc/cache    # CHANGED
+      - .:/app
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+      - dvc-cache:/app/.dvc/cache
     working_dir: /app
     env_file:
       - .env
