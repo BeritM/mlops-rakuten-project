@@ -51,43 +51,46 @@ class DVCPushManager:
             raise
     
     def setup_git_credentials(self) -> bool:
-        """Setup Git credentials for authentication."""
         if self.credentials_configured:
             return True
-            
+
         if not all([self.github_token, self.repo_owner, self.repo_name]):
             logger.error("GitHub credentials not properly set in environment")
-            logger.error(f"GITHUB_TOKEN: {'SET' if self.github_token else 'MISSING'}")
-            logger.error(f"GITHUB_REPO_OWNER: {self.repo_owner or 'MISSING'}")
-            logger.error(f"GITHUB_REPO_NAME: {self.repo_name or 'MISSING'}")
             return False
-        
+
         try:
-            # Setup git credentials file
+            # 1️⃣ Remote-URL ohne eingebettete Zugangsdaten
+            remote_url = (
+                f"https://github.com/{self.repo_owner}/{self.repo_name}.git"
+            )
+            self._run_command(["git", "remote", "set-url", "origin", remote_url])
+
+            # 2️⃣ .git-credentials im korrekten Schema
             cred_file = os.path.expanduser("~/.git-credentials")
             os.makedirs(os.path.dirname(cred_file), exist_ok=True)
             with open(cred_file, "w") as fh:
-                fh.write(f"https://{self.github_token}@github.com\n")
-            
-            # Configure git to use credential store
-            self._run_command(["git", "config", "--global", "credential.helper", "store"])
-            
-            # Set remote URL
-            remote_url = f"https://github.com/{self.repo_owner}/{self.repo_name}.git"
-            self._run_command(["git", "remote", "set-url", "origin", remote_url])
-            
-            # Configure git user (required for commits)
-            self._run_command(["git", "config", "--global", "user.email", "pipeline@example.com"])
-            self._run_command(["git", "config", "--global", "user.name", "ML Pipeline"])
-            
-            logger.info("Git credentials configured successfully")
+                fh.write(
+                    f"https://x-access-token:{self.github_token}@github.com\n"
+                )
+
+            self._run_command(
+                ["git", "config", "--global", "credential.helper", "store"]
+            )
+            self._run_command(
+                ["git", "config", "--global", "user.email", "pipeline@example.com"]
+            )
+            self._run_command(
+                ["git", "config", "--global", "user.name", "ML Pipeline"]
+            )
+
             self.credentials_configured = True
+            logger.info("Git credentials configured successfully")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to setup git credentials: {e}")
             return False
-    
+
     def find_dvc_files(self) -> List[Path]:
         """Find all DVC files in the repository."""
         dvc_files = list(Path(self.cwd).rglob("*.dvc"))
