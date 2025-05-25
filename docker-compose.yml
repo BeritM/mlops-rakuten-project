@@ -74,50 +74,66 @@ services:
       sh -c "python plugins/cd4ml/model_validation/run_model_validation.py \
       && dvc push"
 
-  #tests:
-  #  build:
-  #    context: "."
-  #    dockerfile: "dockerfiles/tests/Dockerfile"
-  #  volumes:
-  #    - ".:/workspace"                                     
-  #    - "dvc-cache:/workspace/.dvc/cache"                 
-  #    - "./shared_volume/data:/workspace/data"              
-  #    - "./shared_volume/models:/workspace/models"         
-  #    - "./shared_volume/data:/app/data"
-  #    - "./shared_volume/models:/app/models"
-  #  #environment:
-  #  # - DATA_INPUT_DIR=/app/data
-  #  # - MODEL_OUTPUT_DIR=/app/models
-  #  working_dir: /workspace
-  #  env_file:
-  #    - .env
-  #  depends_on:
-  #    model_validation:
-  #      condition: service_completed_successfully
-  #    dvc-sync:
-  #      condition: service_completed_successfully
-  #  command: >
-  #    sh -c "pytest plugins/cd4ml/tests/test_inference.py -v -rA \
-  #    && dvc push"
+  tests:
+    build:
+      context: "."
+      dockerfile: "dockerfiles/tests/Dockerfile"
+    volumes:
+      - ".:/workspace"                                     
+      - "dvc-cache:/workspace/.dvc/cache"                 
+      - "./shared_volume/data:/workspace/data"              
+      - "./shared_volume/models:/workspace/models"         
+      - "./shared_volume/data:/app/data"
+      - "./shared_volume/models:/app/models"
+    #environment:
+    # - DATA_INPUT_DIR=/app/data
+    # - MODEL_OUTPUT_DIR=/app/models
+    working_dir: /workspace
+    env_file:
+      - .env
+    depends_on:
+      model_validation:
+        condition: service_completed_successfully
+      dvc-sync:
+        condition: service_completed_successfully
+    command: >
+      sh -c "pytest plugins/cd4ml/tests/test_predict_service.py -v -rA \
+      && dvc push"
 
-  #inference:
-  #  build:
-  #    context: "."
-  #    dockerfile: "dockerfiles/inference/Dockerfile"
-  #  ports:
-  #    - "8000:8000"
-  #  volumes:
-  #    - ./shared_volume/data:/app/data
-  #    - ./shared_volume/models:/app/models
-  #    - dvc-cache:/workspace/.dvc/cache
-  #  depends_on:
-  #    model_validation:
-  #      condition: service_completed_successfully
-  #    dvc-sync:
-  #      condition: service_completed_successfully
-  #  env_file:
-  #    - .env
-  #  command: ["uvicorn", "plugins.cd4ml.inference.infer:app", "--host", "0.0.0.0", "--port", "8000"]
+  auth_service:
+    build:
+      context: "."
+      dockerfile: "dockerfiles/auth_service/Dockerfile"
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    command: ["uvicorn", "plugins.cd4ml.inference.auth_service:auth_app", "--host", "0.0.0.0", "--port", "8001"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  predict_service:
+    build:
+      context: "."
+      dockerfile: "dockerfiles/predict_service/Dockerfile"
+    env_file:
+      - .env
+    ports:
+      - "8002:8002"
+    volumes:
+      #- "./shared_volume/data:/app/data" Not necessary for prediction
+      - "./shared_volume/models:/app/models"
+      - dvc-cache:/workspace/.dvc/cache
+    depends_on:
+      auth_service:
+        condition: service_healthy
+      dvc-sync:
+        condition: service_completed_successfully
+    command: ["uvicorn", "plugins.cd4ml.inference.predict_service:predict_app", "--host", "0.0.0.0", "--port", "8002"]
+  
 
 volumes:
   dvc-cache:
