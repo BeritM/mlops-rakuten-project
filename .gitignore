@@ -22,4 +22,5 @@ __pycache__/
 env
 venv
 my_env
-/models
+/data/
+/models/
