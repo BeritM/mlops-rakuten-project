@@ -3,6 +3,7 @@ import joblib
 import mlflow
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from nltk.corpus import stopwords
 from jose import JWTError, jwt
@@ -130,7 +131,7 @@ model_metrics = run_info.data.metrics
 
 #### Max ####
 # Module-wide instantiation removed and predictor variable declared
-predictor: Optional[ProductTypePredictorMLflow] = None  # CHANGED
+predictor: Optional[ProductTypePredictorMLflow] = None 
 
 # Max: Startup hook for loading the predictor
 @app.on_event("startup") 
@@ -147,6 +148,11 @@ def load_predictor():
     except FileNotFoundError as e: 
         print(f" Predictor loading failed: {e}") 
 #### Max ####
+
+# --- welcome Endpoint --- 
+@app.get("/")
+def read_root():
+    return JSONResponse(content={"message": "Welcome to the Show!"})
 
 # --- Authentication Endpoints ---
 @app.post("/login")
