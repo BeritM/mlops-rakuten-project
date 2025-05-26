@@ -22,3 +22,5 @@ __pycache__/
 env
 venv
 my_env
+/data/
+/models/

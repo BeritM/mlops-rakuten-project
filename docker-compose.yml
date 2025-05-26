@@ -4,70 +4,93 @@ services:
       context: ./dockerfiles/dvc
       dockerfile: Dockerfile
     volumes:
-      - .:/workspace
-      - dvc-cache:/workspace/.dvc/cache
-    working_dir: /workspace
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+    working_dir: /app
     environment:
-  # Authentification
-      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN} 
+      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
     command: ["dvc", "pull", "--force"]
-    # command: ["dvc", "pull"]
+  
   preprocessing:
     build:
       context: .
       dockerfile: dockerfiles/preprocessing/Dockerfile
     volumes:
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
     depends_on:
       dvc-sync:
         condition: service_completed_successfully
-    env_file:
-      - .env
-    command: ["python", "plugins/cd4ml/data_processing/run_preprocessing.py"]
-
-
+    command: >
+      sh -c "python plugins/cd4ml/data_processing/run_preprocessing.py"
+  
   model_training:
     build:
       context: .
       dockerfile: dockerfiles/model_training/Dockerfile
     volumes:
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
-    depends_on:
-      preprocessing:
-        condition: service_completed_successfully
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+    working_dir: /app
     env_file:
       - .env
     environment:
-      - MODEL_OUTPUT_DIR=/app/models
-      - DATA_INPUT_DIR=/app/data/processed
-    command: ["python", "plugins/cd4ml/model_training/run_model_training.py"]
-
-
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
+    depends_on:
+      preprocessing:
+        condition: service_completed_successfully
+    command: >
+      sh -c "python plugins/cd4ml/model_training/run_model_training.py"
+  
   model_validation:
     build:
       context: .
       dockerfile: dockerfiles/model_validation/Dockerfile
     volumes:
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+    working_dir: /app
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
     depends_on:
       model_training:
         condition: service_completed_successfully
-    env_file:
-      - .env
-    command: ["python", "plugins/cd4ml/model_validation/run_model_validation.py"]
-
+    command: >
+      sh -c "python plugins/cd4ml/model_validation/run_model_validation.py"
+  
   tests:
     build:
-      context: . 
+      context: .
       dockerfile: dockerfiles/tests/Dockerfile
     volumes:
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+    working_dir: /app
     env_file:
       - .env
     depends_on:
@@ -75,7 +98,8 @@ services:
         condition: service_completed_successfully
       dvc-sync:
         condition: service_completed_successfully
-    command: ["pytest", "plugins/cd4ml/tests/test_inference.py", "-v", "-rA"]
+    command: >
+      sh -c "dvc pull --force && pytest plugins/cd4ml/tests/test_inference.py -v -rA && dvc push"
   
   inference:
     build:
@@ -84,16 +108,18 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - "./shared_volume/data:/app/data"
-      - "./shared_volume/models:/app/models"
-      - dvc-cache:/workspace/.dvc/cache
+      - .:/app
+      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+      - dvc-cache:/app/.dvc/cache
+    working_dir: /app
+    env_file:
+      - .env
     depends_on:
       model_validation:
         condition: service_completed_successfully
       dvc-sync:
         condition: service_completed_successfully
-    env_file:
-      - .env
     command: ["uvicorn", "plugins.cd4ml.inference.infer:app", "--host", "0.0.0.0", "--port", "8000"]
+
 volumes:
   dvc-cache:
