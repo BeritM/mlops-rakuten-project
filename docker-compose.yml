@@ -129,8 +129,6 @@ services:
       - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
       - dvc-cache:/app/.dvc/cache
     working_dir: /app
-    env_file:
-      - .env
     depends_on:
       auth_service:
         condition: service_healthy
