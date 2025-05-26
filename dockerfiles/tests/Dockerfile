@@ -20,4 +20,4 @@ RUN python -m nltk.downloader punkt stopwords punkt_tab wordnet
 # COPY . .  # plugins/cd4ml/tests /app/plugins/cd4ml/tests
 
 # Standardkommando
-CMD ["pytest", "plugins/cd4ml/tests/test_inference.py", "-v", "-rA"]
+CMD ["pytest", "plugins/cd4ml/tests/test_predict_service.py", "-v", "-rA"]

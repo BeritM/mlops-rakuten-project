@@ -14,9 +14,6 @@ import plugins.cd4ml.inference.infer as infer_mod
 # ---------------------------------------------------
 # # Determine data/model directories from environment
 # ---------------------------------------------------
-#VECTOR_PATH       = os.path.join("data", "processed", "tfidf_vectorizer.pkl")
-#MODEL_PATH        = os.path.join("models", "sgd_text_model.pkl")
-#PRODUCT_DICT_PATH = os.path.join("models", "product_dictionary.pkl")
 
 VECTOR_PATH = os.path.join(os.getenv("MODEL_DIR"), os.getenv("TFIDF_VECTORIZER"))
 MODEL_PATH = os.path.join(os.getenv("MODEL_DIR"), os.getenv("MODEL"))
