@@ -5,12 +5,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Trigger auf main und develop
+# Trigger for main and develop branches
+# This workflow builds and pushes Docker images for various services in a machine learning pipeline.
+# and just for testing the dev_new-feature-githubactions branch as well, will be dropped after testing.
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, dev_new-feature-githubactions ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
   REGISTRY: ghcr.io
@@ -88,7 +90,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # 3) model_training (nach preprocessing)
+  # 3) model_training (after preprocessing)
   model_training:
     runs-on: ubuntu-latest
     needs: preprocessing
@@ -124,7 +126,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # 4) model_validation (nach model_training)
+  # 4) model_validation (after model_training)
   model_validation:
     runs-on: ubuntu-latest
     needs: model_training
@@ -160,7 +162,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # 5) tests (nach model_validation)
+  # 5) tests (after model_validation)
   tests:
     runs-on: ubuntu-latest
     needs: model_validation
