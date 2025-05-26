@@ -23,22 +23,27 @@ DAGSHUB_USER_TOKEN = os.getenv("DAGSHUB_USER_TOKEN")
 DAGSHUB_REPO_OWNER = os.getenv("DAGSHUB_REPO_OWNER")
 DAGSHUB_REPO_NAME  = os.getenv("DAGSHUB_REPO_NAME")
 
-# ---------- Pfade ----------
+# ---------- Paths ----------
 INPUT_DIR  = os.getenv("DATA_PROCESSED_DIR")
 OUTPUT_DIR = os.getenv("MODEL_DIR")
-
-X_TRAIN_TFIDF_PATH    = os.path.join(INPUT_DIR,  os.getenv("X_TRAIN_TFIDF"))
-Y_TRAIN_PATH          = os.path.join(INPUT_DIR,  os.getenv("Y_TRAIN"))
-X_VALIDATE_TFIDF_PATH = os.path.join(INPUT_DIR,  os.getenv("X_VALIDATE_TFIDF"))
-Y_VALIDATE_PATH       = os.path.join(INPUT_DIR,  os.getenv("Y_VALIDATE"))
-MODEL_PATH            = os.path.join(OUTPUT_DIR, os.getenv("MODEL"))
+X_TRAIN_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_TRAIN_TFIDF"))
+Y_TRAIN_PATH = os.path.join(INPUT_DIR, os.getenv("Y_TRAIN"))
+X_VALIDATE_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_VALIDATE_TFIDF"))
+Y_VALIDATE_PATH = os.path.join(INPUT_DIR, os.getenv("Y_VALIDATE"))
+MODEL_PATH = os.path.join(OUTPUT_DIR, os.getenv("MODEL"))
+CLASS_REPORT_PATH = os.path.join(OUTPUT_DIR, "CLASS_REPORT")
+VECTORIZER_PATH = os.path.join(OUTPUT_DIR, os.getenv("TFIDF_VECTORIZER"))
+PRODUCT_DICTIONARY_PATH = os.path.join(OUTPUT_DIR, os.getenv("PRODUCT_DICTIONARY"))
+PARAM_CONFIG_PATH = os.getenv("PARAM_CONFIG")
+RUN_ID_PATH = os.path.join(OUTPUT_DIR, os.getenv("CURRENT_RUN_ID"))
 
 def validate_environment():
     """Validate that all required environment variables are set."""
     required_vars = [
         "DATA_PROCESSED_DIR", "MODEL_DIR",
         "X_TRAIN_TFIDF", "Y_TRAIN", "X_VALIDATE_TFIDF", "Y_VALIDATE", "MODEL",
-        "DAGSHUB_USER_NAME", "DAGSHUB_USER_TOKEN", "DAGSHUB_REPO_OWNER", "DAGSHUB_REPO_NAME"
+        "DAGSHUB_USER_NAME", "DAGSHUB_USER_TOKEN", "DAGSHUB_REPO_OWNER", "DAGSHUB_REPO_NAME",
+        "CLASS_REPORT", "TFIDF_VECTORIZER", "PRODUCT_DICTIONARY", "PARAM_CONFIG", "CURRENT_RUN_ID"
     ]
     
     missing_vars = [var for var in required_vars if not os.getenv(var)]
@@ -68,7 +73,7 @@ def validate_input_files():
     
     print("All required input files found.")
 
-def load_config(filename="param_config.yml"):
+def load_config(filename=PARAM_CONFIG_PATH):
     """Load configuration from YAML file."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(script_dir, filename)
@@ -143,7 +148,7 @@ def main():
 
         # 3. Load configuration
         print("\n3. Loading model configuration...")
-        config_param = load_config("param_config.yml")
+        config_param = load_config(PARAM_CONFIG_PATH)
         model_params = config_param.get("model", {}).get("params", {})
         print(f"Model parameters: {model_params}")
 
@@ -153,7 +158,6 @@ def main():
 
         # 5. Train model with MLflow tracking
         print("\n5. Training model...")
-        class_report_path = os.path.join(OUTPUT_DIR, "training_class_report.txt")
         
         with mlflow.start_run() as run:
             run_id = run.info.run_id
@@ -171,9 +175,9 @@ def main():
             
             # Generate classification report
             report = classification_report(y_validate, y_pred)
-            with open(class_report_path, "w") as fh:
-                fh.write(report)
-            print(f"Classification report saved to: {class_report_path}")
+            with open(CLASS_REPORT_PATH, "w") as f:
+                f.write(report)
+            print(f"Classification report saved to: {CLASS_REPORT_PATH}")
             
             # Log parameters and metrics to MLflow
             mlflow.log_param("loss", model_params.get("loss", "unknown"))
@@ -183,6 +187,7 @@ def main():
             mlflow.log_param("training_samples", X_train_tfidf.shape[0])
             mlflow.log_param("validation_samples", X_validate_tfidf.shape[0])
             mlflow.log_param("feature_count", X_train_tfidf.shape[1])
+            
             mlflow.log_metric("f1_weighted", f1_weighted)
             
             # Log model to MLflow
@@ -193,18 +198,19 @@ def main():
             )
             
             # Log classification report as artifact
-            mlflow.log_artifact(class_report_path)
+            mlflow.log_artifact(CLASS_REPORT_PATH, artifact_path="classification_report")
+            mlflow.log_artifact(VECTORIZER_PATH, artifact_path="vectorizer")
+            mlflow.log_artifact(PRODUCT_DICTIONARY_PATH, artifact_path="product_dictionary")
             
             # Save run ID for later use
-            run_id_path = os.path.join(OUTPUT_DIR, "current_run_id.txt")
-            with open(run_id_path, "w") as fh:
-                fh.write(run_id)
-            print(f"Run ID saved to: {run_id_path}")
+            with open(RUN_ID_PATH, "w") as f:
+                f.write(run_id)
+            print(f"Run ID saved to: {RUN_ID_PATH}")
 
-        # 6. Save model locally
-        print("\n6. Saving model locally...")
-        joblib.dump(model, MODEL_PATH)
-        print(f"Model saved to: {MODEL_PATH}")
+        ## 6. Save model locally
+        #print("\n6. Saving model locally...")
+        #joblib.dump(model, MODEL_PATH)
+        #print(f"Model saved to: {MODEL_PATH}")
         
         # Summary
         print("\n" + "=" * 60)
@@ -215,7 +221,7 @@ def main():
         print(f"Features: {X_train_tfidf.shape[1]}")
         print(f"Validation F1 score: {f1_weighted:.4f}")
         print(f"MLflow run ID: {run_id}")
-        print(f"Model saved at: {MODEL_PATH}")
+        #print(f"Model saved at: {MODEL_PATH}")
 
     except Exception as e:
         print(f"\nERROR in model training pipeline: {e}")

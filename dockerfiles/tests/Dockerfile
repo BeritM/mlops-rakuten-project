@@ -17,4 +17,4 @@ COPY . .
 RUN cp -R shared_volume/data /app/ && cp -R shared_volume/models /app/
 
 # Command
-CMD ["pytest", "plugins/cd4ml/tests/test_inference.py", "-v", "-rA"]
+CMD ["pytest", "plugins/cd4ml/tests/test_predict_service.py", "-v", "-rA"]
