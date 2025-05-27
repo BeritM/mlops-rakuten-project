@@ -22,7 +22,7 @@ jobs:
           touch .env
           mkdir -p shared_volume/data shared_volume/models
 
-      - name: Create CI override (skip DVC & MLflow steps)
+      - name: Create CI override (skip DVC, Preproc, Training, Validation)
         run: |
           cat > docker-compose.ci.yml << 'EOF'
           version: '3.8'
@@ -35,19 +35,17 @@ jobs:
               command: ["sh", "-c", "echo 'Skipping model_training in CI'"]
             model_validation:
               command: ["sh", "-c", "echo 'Skipping model_validation in CI'"]
-            tests:
-              command: ["sh", "-c", "echo 'Skipping tests in CI'"]
           EOF
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build all pipeline images
+      - name: Build only auth_service & predict_service
         run: |
           docker compose \
             -f docker-compose.yml \
             -f docker-compose.ci.yml \
-            build
+            build auth_service predict_service
 
       - name: Start auth_service & predict_service
         run: |
@@ -59,17 +57,17 @@ jobs:
       - name: Wait for health endpoints
         run: |
           for port in 8001 8002; do
-            for i in {1..10}; do curl -fs "http://127.0.0.1:$port/health" && break || sleep 3; done
+            for i in {1..10}; do
+              curl -fs "http://127.0.0.1:$port/health" && break || sleep 3
+            done
           done
 
       - name: Functional check of /login and /predict
         run: |
-          # Login
           TOKEN=$(curl -fs -X POST http://127.0.0.1:8001/login \
             -d "username=admin&password=admin123" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             | jq -r .access_token)
-          # Predict
           curl -f -X POST "http://127.0.0.1:8002/predict?token=$TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"designation":"Test","description":"Desc"}'
@@ -89,7 +87,7 @@ jobs:
     outputs:
       services: ${{ steps.set-services.outputs.services }}
     steps:
-      - name: Checkout full history
+      - name: Fetch full history
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -99,14 +97,12 @@ jobs:
         run: |
           CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
           SERVICES=()
-
-          # Für jeden Pipeline-Schritt prüfen wir Dockerfile- oder Code-Änderungen
-          if echo "$CHANGED" | grep -qE '^dockerfiles/dvc/'; then               SERVICES+=("dvc"); fi
+          if echo "$CHANGED" | grep -qE '^dockerfiles/dvc/'; then                 SERVICES+=("dvc"); fi
           if echo "$CHANGED" | grep -qE '^dockerfiles/preprocessing/|^plugins/cd4ml/data_processing/'; then SERVICES+=("preprocessing"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/model_training/|^plugins/cd4ml/model_training/'; then  SERVICES+=("model_training"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/model_validation/|^plugins/cd4ml/model_validation/'; then  SERVICES+=("model_validation"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/tests/|^plugins/cd4ml/tests/'; then                  SERVICES+=("tests"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/auth_service/|^plugins/cd4ml/inference/auth_service'; then   SERVICES+=("auth_service"); fi
+          if echo "$CHANGED" | grep -qE '^dockerfiles/model_training/|^plugins/cd4ml/model_training/'; then    SERVICES+=("model_training"); fi
+          if echo "$CHANGED" | grep -qE '^dockerfiles/model_validation/|^plugins/cd4ml/model_validation/'; then SERVICES+=("model_validation"); fi
+          if echo "$CHANGED" | grep -qE '^dockerfiles/tests/|^plugins/cd4ml/tests/'; then                      SERVICES+=("tests"); fi
+          if echo "$CHANGED" | grep -qE '^dockerfiles/auth_service/|^plugins/cd4ml/inference/auth_service'; then  SERVICES+=("auth_service"); fi
           if echo "$CHANGED" | grep -qE '^dockerfiles/predict_service/|^plugins/cd4ml/inference/predict_service'; then SERVICES+=("predict_service"); fi
 
           if [ ${#SERVICES[@]} -eq 0 ]; then
