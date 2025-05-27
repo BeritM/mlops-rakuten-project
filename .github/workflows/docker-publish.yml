@@ -24,15 +24,21 @@ jobs:
           pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Pull DVC-Daten (optional)
-        if: ${{ secrets.DAGSHUB_USER_TOKEN != '' }}
+      - name: Pull DVC-Daten
         env:
-          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_USER_TOKEN }}
-          DAGSHUB_REPO_OWNER: ${{ secrets.DAGSHUB_REPO_OWNER }}
-          DAGSHUB_REPO_NAME: ${{ secrets.DAGSHUB_REPO_NAME }}
+          DVC_TOKEN: ${{ secrets.DAGSHUB_USER_TOKEN }}
+          DVC_OWNER: ${{ secrets.DAGSHUB_REPO_OWNER }}
+          DVC_REPO: ${{ secrets.DAGSHUB_REPO_NAME }}
         run: |
-          pip install "dvc[datascience]"
-          dvc pull --force
+          if [ -n "$DVC_TOKEN" ]; then
+            pip install "dvc[datascience]"
+            export DAGSHUB_USER_TOKEN=$DVC_TOKEN
+            export DAGSHUB_REPO_OWNER=$DVC_OWNER
+            export DAGSHUB_REPO_NAME=$DVC_REPO
+            dvc pull --force
+          else
+            echo "No DVC token, skipping pull."
+          fi
 
       - name: Run pytest
         run: pytest plugins/cd4ml/tests/test_predict_service.py -v -rA
