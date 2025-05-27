@@ -1,5 +1,10 @@
 name: CI – E2E Test & Conditional Docker Publish
 
+# Verhindert parallele Runs desselben Branches und bricht alte Builds ab
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ main, develop, dev_new-feature-githubactions ]
@@ -29,7 +34,6 @@ jobs:
           cat > docker-compose.ci.yml << 'EOF'
           services:
             dvc-sync:
-              # .env mit DAGSHUB_TOKEN einlesen
               env_file:
                 - .env
               command: >
@@ -38,7 +42,6 @@ jobs:
                   dvc remote modify dagshub auth token \$DAGSHUB_TOKEN &&
                   dvc pull --quiet --jobs \$(nproc)
                 "
-              # Bind-Mount auf GitHub-Runner-Verzeichnisse
               volumes:
                 - ./shared_volume/data:/app/data
                 - ./shared_volume/models:/app/models:ro
