@@ -1,149 +1,90 @@
-name: CI – E2E Test & Conditional Docker Publish
+name: CI – Build, Test & Push Docker Image
 
-# Verhindert parallele Runs desselben Branches und bricht alte Builds ab
+on:
+  push:
+    branches:
+      - main
+      - release/**
+
+permissions:
+  contents: read
+  packages: write  # für Docker-Push
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-on:
-  push:
-    branches: [ main, develop, dev_new-feature-githubactions ]
-  pull_request:
-    branches: [ main, develop, dev_new-feature-githubactions ]
-
-permissions:
-  contents: read
-
 jobs:
-  e2e-test:
-    name: E2E Tests via Docker Compose
+  # 1. Unit Tests als eigenständiger Job
+  unit-tests:
+    name: Run Unit Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Prepare .env & shared_volume
-        run: |
-          cat > .env <<EOF
-          DAGSHUB_TOKEN=${{ secrets.DAGSHUB_TOKEN }}
-          EOF
-          mkdir -p shared_volume/data shared_volume/models
-
-      - name: Create CI override (DVC Pull & stub others)
-        run: |
-          cat > docker-compose.ci.yml << 'EOF'
-          services:
-            dvc-sync:
-              env_file:
-                - .env
-              command: >
-                sh -c "
-                  # nur anlegen, falls noch nicht konfiguriert
-                  if ! dvc remote list 2>/dev/null | grep -q '^dagshub'; then
-                    dvc remote add -f dagshub https://dagshub.com/BeritM/mlops-rakuten-project.dvc;
-                  fi &&
-                  dvc remote modify dagshub auth token \$DAGSHUB_TOKEN &&
-                  dvc pull --quiet --jobs \$(nproc)
-                "
-              volumes:
-                - ./shared_volume/data:/app/data
-                - ./shared_volume/models:/app/models:ro
-
-            preprocessing:
-              command: ["sh", "-c", "echo 'Skipping preprocessing in CI'"]
-            model_training:
-              command: ["sh", "-c", "echo 'Skipping model_training in CI'"]
-            model_validation:
-              command: ["sh", "-c", "echo 'Skipping model_validation in CI'"]
-          EOF
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Build only auth_service & predict_service
-        run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ci.yml \
-            build auth_service predict_service
-
-      - name: Start auth_service & predict_service
-        run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ci.yml \
-            up -d auth_service predict_service
-
-      - name: Wait for health endpoints
-        run: |
-          set -e
-          for port in 8001 8002; do
-            for i in {1..10}; do
-              curl -fs "http://127.0.0.1:$port/health" && break || sleep 3
-            done
-          done
-
-      - name: Functional check of /login and /predict
-        run: |
-          TOKEN=$(curl -fs -X POST http://127.0.0.1:8001/login \
-            -d "username=admin&password=admin123" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            | jq -r .access_token)
-          curl -f -X POST "http://127.0.0.1:8002/predict?token=$TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"designation":"Test","description":"Desc"}'
-
-      - name: Tear down
-        if: always()
-        run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ci.yml \
-            down --volumes --remove-orphans
-
-  detect-changes:
-    name: Detect changed pipeline services
-    needs: e2e-test
-    runs-on: ubuntu-latest
-    outputs:
-      services: ${{ steps.set-services.outputs.services }}
-    steps:
-      - name: Fetch full history
-        uses: actions/checkout@v3
+      # Python-Setup
+      - uses: actions/setup-python@v4
         with:
-          fetch-depth: 0
+          python-version: "3.9"
 
-      - name: Determine changed services
-        id: set-services
-        run: |
-          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
-          SERVICES=()
-          if echo "$CHANGED" | grep -qE '^dockerfiles/dvc/'; then                         SERVICES+=("dvc"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/preprocessing/|^plugins/cd4ml/data_processing/'; then SERVICES+=("preprocessing"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/model_training/|^plugins/cd4ml/model_training/'; then    SERVICES+=("model_training"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/model_validation/|^plugins/cd4ml/model_validation/'; then SERVICES+=("model_validation"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/tests/|^plugins/cd4ml/tests/'; then                      SERVICES+=("tests"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/auth_service/|^plugins/cd4ml/inference/auth_service'; then  SERVICES+=("auth_service"); fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/predict_service/|^plugins/cd4ml/inference/predict_service'; then SERVICES+=("predict_service"); fi
+      - name: Install deps
+        run: pip install -r requirements.txt
 
-          if [ ${#SERVICES[@]} -eq 0 ]; then
-            echo "services=[]" >> $GITHUB_OUTPUT
-          else
-            ARR=$(printf '"%s",' "${SERVICES[@]}")
-            echo "services=[${ARR%,}]" >> $GITHUB_OUTPUT
-          fi
+      - name: Run pytest
+        run: pytest --maxfail=1 --disable-warnings -q
 
-  publish:
-    name: Build & Push Changed Images
-    needs: [ e2e-test, detect-changes ]
-    if: ${{ needs.e2e-test.result == 'success' && needs.detect-changes.outputs.services != '[]' }}
+  # 2. Build & Test Docker-Image
+  build-and-test:
+    name: Build & Test Docker Image
+    needs: unit-tests
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+
+      # Buildx einrichten, um multi-arch-Caching zu erlauben
+      - uses: docker/setup-buildx-action@v2
+        with:
+          buildkitd-flags: --debug
+
+      # Optionales Caching via GitHub Packages oder Docker Hub
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      # Image bauen und lokal taggen
+      - name: Build image
+        run: |
+          docker buildx build \
+            --cache-to type=local,dest=/tmp/.buildx-cache-new \
+            --cache-from type=local,src=/tmp/.buildx-cache \
+            --load \
+            -t igurstein/rakuten_dev:${{ github.sha }} \
+            .
+
+      # Layer-Cache für nächste Runs aktualisieren
+      - name: Save cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      # Smoke-Tests oder Integrationstests im Container
+      - name: Smoke test container
+        run: |
+          docker run --rm igurstein/rakuten_dev:${{ github.sha }} \
+            sh -c "pytest --maxfail=1 --disable-warnings -q tests/integration"
+
+  # 3. Push only if build-and-test succeeded
+  push:
+    name: Push Docker Image
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: ${{ needs.build-and-test.result == 'success' }}
+    steps:
+      - uses: actions/checkout@v3
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -151,12 +92,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build & push ${{ matrix.service }}
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: dockerfiles/${{ matrix.service }}/Dockerfile
-          push: true
-          tags: |
-            igurstein/rakuten_dev:${{ matrix.service }}-latest
-            igurstein/rakuten_dev:${{ matrix.service }}-${{ github.sha }}
+      - name: Push image
+        run: |
+          docker tag igurstein/rakuten_dev:${{ github.sha }} igurstein/rakuten_dev:latest
+          docker push igurstein/rakuten_dev:${{ github.sha }}
+          docker push igurstein/rakuten_dev:latest
