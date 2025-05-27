@@ -19,16 +19,27 @@ jobs:
 
       - name: Prepare .env & shared_volume
         run: |
-          touch .env
+          cat > .env <<EOF
+          DAGSHUB_TOKEN=${{ secrets.DAGSHUB_TOKEN }}
+          EOF
           mkdir -p shared_volume/data shared_volume/models
 
-      - name: Create CI override (skip DVC, Preproc, Training, Validation)
+      - name: Create CI override (DVC Pull & stub others)
         run: |
           cat > docker-compose.ci.yml << 'EOF'
           version: '3.8'
           services:
             dvc-sync:
-              command: ["sh", "-c", "echo 'Skipping DVC sync in CI'"]
+              command: >
+                sh -c "
+                  # configure Dagshub-Remote und ziehe Daten & Modell
+                  dvc remote add -f dagshub https://dagshub.com/BeritM/mlops-rakuten-project.dvc &&
+                  dvc remote modify dagshub auth token \$DAGSHUB_TOKEN &&
+                  dvc pull --quiet --jobs \$(nproc)
+                "
+              volumes:
+                - shared_volume/data:/app/data
+                - shared_volume/models:/app/models
             preprocessing:
               command: ["sh", "-c", "echo 'Skipping preprocessing in CI'"]
             model_training:
@@ -56,6 +67,7 @@ jobs:
 
       - name: Wait for health endpoints
         run: |
+          set -e
           for port in 8001 8002; do
             for i in {1..10}; do
               curl -fs "http://127.0.0.1:$port/health" && break || sleep 3
@@ -97,7 +109,7 @@ jobs:
         run: |
           CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
           SERVICES=()
-          if echo "$CHANGED" | grep -qE '^dockerfiles/dvc/'; then                 SERVICES+=("dvc"); fi
+          if echo "$CHANGED" | grep -qE '^dockerfiles/dvc/'; then                         SERVICES+=("dvc"); fi
           if echo "$CHANGED" | grep -qE '^dockerfiles/preprocessing/|^plugins/cd4ml/data_processing/'; then SERVICES+=("preprocessing"); fi
           if echo "$CHANGED" | grep -qE '^dockerfiles/model_training/|^plugins/cd4ml/model_training/'; then    SERVICES+=("model_training"); fi
           if echo "$CHANGED" | grep -qE '^dockerfiles/model_validation/|^plugins/cd4ml/model_validation/'; then SERVICES+=("model_validation"); fi
