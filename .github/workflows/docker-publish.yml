@@ -2,9 +2,9 @@ name: CI & Docker-Publish
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop, dev_new-feature-githubactions ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop, dev_new-feature-githubactions ]
 
 jobs:
   test:
