@@ -11,7 +11,7 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  IMAGE_NAME: igurstein/rakuten_dev    # your DockerHub repo
+  IMAGE_NAME: igurstein/rakuten_dev    
   TAG: ${{ github.sha }}               # immutable commit-specific tag
 
 jobs:
@@ -33,13 +33,17 @@ jobs:
           python -m venv .venv
           echo "Upgrading pip & setuptools"
           .venv/bin/pip install --upgrade pip setuptools
+
           echo "Installing project requirements"
           if [ -f requirements.txt ]; then
             .venv/bin/pip install -r requirements.txt
           else
-            echo "No requirements.txt found, installing pytest only"
-            .venv/bin/pip install pytest
+            echo "No requirements.txt found."
           fi
+
+          echo "Installing test-only dependencies"
+          .venv/bin/pip install joblib fastapi pytest
+
           echo "Installed packages:"
           .venv/bin/pip list
 
@@ -70,13 +74,11 @@ jobs:
       - name: Determine changed services
         id: services
         run: |
-          # List top-level directories changed in the last commit
           CHANGED=$(git diff --name-only ${{ github.sha }} ${{ github.sha }}^ \
             | cut -d/ -f1 \
             | sort -u \
             | grep -E '^(dockerfiles|plugins|dvc-sync|preprocessing|model_training|model_validation|tests|auth_service|predict_service)$' \
             || echo "")
-          # Map changed dirs to compose service names
           SERVICES=""
           for D in $CHANGED; do
             case "$D" in
@@ -89,7 +91,6 @@ jobs:
               dockerfiles/predict_service)  SERVICES="$SERVICES predict_service";;
             esac
           done
-          # If none matched, build all
           if [ -z "$SERVICES" ]; then
             echo "No service-specific changes detected; building all."
             echo "::set-output name=list::"
