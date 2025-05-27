@@ -11,7 +11,7 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  IMAGE_NAME: igurstein/rakuten_dev    
+  IMAGE_NAME: igurstein/rakuten_dev    # your DockerHub repo
   TAG: ${{ github.sha }}               # immutable commit-specific tag
 
 jobs:
@@ -42,7 +42,7 @@ jobs:
           fi
 
           echo "Installing test-only dependencies"
-          .venv/bin/pip install joblib fastapi pytest
+          .venv/bin/pip install pytest joblib fastapi httpx
 
           echo "Installed packages:"
           .venv/bin/pip list
