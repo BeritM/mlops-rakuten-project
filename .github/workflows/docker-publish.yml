@@ -15,9 +15,9 @@ env:
   TAG: ${{ github.sha }}               # immutable commit-specific tag
 
 jobs:
-  # 1) Run pure-Python unit tests in a virtualenv
+  # 1) Run Python tests & DVC steps in a virtualenv
   test-venv:
-    name: Run unit tests in virtualenv
+    name: Run DVC sync & unit tests in virtualenv
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -42,15 +42,25 @@ jobs:
           fi
 
           echo "Installing test-only dependencies"
-          .venv/bin/pip install pytest joblib fastapi httpx mlflow PyJWT
+          .venv/bin/pip install pytest joblib fastapi httpx mlflow PyJWT dvc
 
           echo "Installed packages:"
           .venv/bin/pip list
 
-      - name: Run tests
+      - name: Pull data via DVC
         run: |
-          echo "Running pytest..."
-          .venv/bin/pytest -vv
+          echo "Running dvc pull --force"
+          .venv/bin/dvc pull --force
+
+      - name: Run pytest suite
+        run: |
+          echo "Running pytest for predict service"
+          .venv/bin/pytest plugins/cd4ml/tests/test_predict_service.py -v -rA
+
+      - name: Push artifacts via DVC
+        run: |
+          echo "Running dvc push"
+          .venv/bin/dvc push
 
   # 2) Rebuild only those Docker services whose code changed
   rebuild-images:
