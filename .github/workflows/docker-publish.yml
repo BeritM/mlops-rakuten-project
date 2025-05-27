@@ -42,7 +42,8 @@ jobs:
           fi
 
           echo "Installing test-only dependencies"
-          .venv/bin/pip install pytest joblib fastapi httpx mlflow PyJWT dvc
+          # include dvc[s3] so S3 remotes work
+          .venv/bin/pip install pytest joblib fastapi httpx mlflow PyJWT "dvc[s3]"
 
           echo "Installed packages:"
           .venv/bin/pip list
