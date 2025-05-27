@@ -119,7 +119,7 @@ def main():
         if "description" not in df.columns:
             raise KeyError("'description' column not found in dataset")
         
-        df["cleaned_text"] = df["description"].astype(str).apply(clean_text)    # clean_text has to be replaced with ProductTypePredictorMLflow.clean_text_static
+        df["cleaned_text"] = df["description"].astype(str).apply(ProductTypePredictorMLflow.clean_text_static)    # clean_text has to be replaced with ProductTypePredictorMLflow.clean_text_static
         print(f"Text cleaning completed. Sample cleaned text: {df['cleaned_text'].iloc[0][:100]}...")
 
         # 3. Train/Validate/Test Split
