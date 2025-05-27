@@ -12,13 +12,13 @@ permissions:
 
 jobs:
   e2e-test:
-    name: Run tests via Docker Compose (skip DVC sync)
+    name: Run tests via Docker Compose
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Prepare .env and shared_volume
+      - name: Prepare .env & shared_volume
         run: |
           touch .env
           mkdir -p shared_volume/data shared_volume/models
@@ -35,21 +35,27 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build all services (with override)
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml build
+      - name: Build all services (including tests)
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            build
 
-      - name: Run tests container (with override)
-        run: docker compose \
-               -f docker-compose.yml \
-               -f docker-compose.ci.yml \
-               up --abort-on-container-exit --exit-code-from tests
+      - name: Run tests container
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            up --abort-on-container-exit --exit-code-from tests
 
       - name: Tear down
         if: always()
-        run: docker compose \
-               -f docker-compose.yml \
-               -f docker-compose.ci.yml \
-               down --volumes --remove-orphans
+        run: |
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            down --volumes --remove-orphans
 
   detect-changes:
     name: Detect changed services
@@ -67,7 +73,6 @@ jobs:
         id: set-services
         run: |
           CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
-          echo "Changed files: $CHANGED"
           services=()
           if echo "$CHANGED" | grep -qE '^dockerfiles/auth_service/|^plugins/cd4ml/inference/auth_service'; then
             services+=('"auth_service"')
@@ -82,7 +87,7 @@ jobs:
           fi
 
   publish:
-    name: Build & Push Docker Images
+    name: Build & Push Changed Images
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.services != '[]' }}
     runs-on: ubuntu-latest
