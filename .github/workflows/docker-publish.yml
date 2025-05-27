@@ -34,7 +34,7 @@ jobs:
                 - .env
               command: >
                 sh -c "
-                  dvc remote add -f dagshub https://dagshub.com/OWNER/REPO.dvc &&
+                  dvc remote add -f dagshub https://dagshub.com/BeritM/mlops-rakuten-project.dvc &&
                   dvc remote modify dagshub auth token \$DAGSHUB_TOKEN &&
                   dvc pull --quiet --jobs \$(nproc)
                 "
