@@ -27,11 +27,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: "3.11"
 
       - name: Install all requirements files
         run: |
           python -m pip install --upgrade pip
+          # findet rekursiv alle requirements*.txt und installiert sie
           find . -type f -name 'requirements*.txt' | while read reqfile; do
             echo "🔍 Installing from $reqfile"
             pip install -r "$reqfile"
@@ -49,13 +50,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Buildx einrichten, um multi-arch-Caching zu erlauben
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
         with:
           buildkitd-flags: --debug
 
-      # Optionales Caching via GitHub Packages oder Docker Hub
       - name: Cache Docker layers
         uses: actions/cache@v3
         with:
@@ -64,7 +63,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      # Image bauen und lokal taggen
       - name: Build image
         run: |
           docker buildx build \
@@ -74,13 +72,11 @@ jobs:
             -t igurstein/rakuten_dev:${{ github.sha }} \
             .
 
-      # Layer-Cache für nächste Runs aktualisieren
       - name: Save cache
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      # Smoke-Tests oder Integrationstests im Container
       - name: Smoke test container
         run: |
           docker run --rm igurstein/rakuten_dev:${{ github.sha }} \
