@@ -3,8 +3,9 @@ name: CI – Build, Test & Push Docker Image
 on:
   push:
     branches:
-      - main
-      - release/**
+      - main 
+      - delevop
+      - dev_new-feature-githubactions
 
 permissions:
   contents: read
