@@ -1,11 +1,11 @@
 name: Build & Push Docker Services
 
 # Prevent overlapping runs: cancel any in-flight workflow for the same branch
-concurrency:
+concurrency: # This ensures only one workflow runs at a time for the same branch
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Trigger this workflow on pushes and PRs to main, develop, and our test branch
+# Trigger this workflow on pushes and PRs to main, develop, and our test branch GithubActions
 on:
   push:
     branches: [ main, develop, dev_new-feature-githubactions ]
@@ -160,22 +160,20 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # 5) tests (after model_validation)
+# 5) tests (after model_validation)
   tests:
     runs-on: ubuntu-latest
     needs: model_validation
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Docker Compose plugin        # required for `docker compose` commands
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose-plugin
+      - name: Set up Docker Compose       # install Docker Compose v2 as a GitHub Action
+        uses: docker/compose-action@v2
 
-      - name: Create shared_volume directory       # ensure the mount target exists
+      - name: Create shared_volume directory  # ensure the mount target exists
         run: mkdir -p shared_volume
 
-      - name: Build tests image locally            # build the tests service without pushing
+      - name: Build tests image locally       # build the tests service without pushing
         run: docker compose build tests
 
       - name: Log in to GitHub Container Registry
@@ -185,12 +183,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull pipeline images                 # bring in dvc-sync & model-validation
+      - name: Pull pipeline images            # bring in dvc-sync & model-validation
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-dvc-sync:latest
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-validation:latest
 
-      - name: Run tests via Docker Compose         # execute the test suite
+      - name: Run tests via Docker Compose    # execute the test suite inside the built image
         run: docker compose run --rm tests
 
   # 6) auth_service (after tests)
