@@ -11,75 +11,35 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Run pytest
+  e2e-test:
+    name: Run tests via docker-compose
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: .
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Create predict_api alias for tests
-        run: |
-          echo "from plugins.cd4ml.inference.predict_service import predict_app, SECRET_KEY, ALGORITHM" > predict_api.py
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
+      - name: Build all services
+        run: docker-compose build
 
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          # Core-Abhängigkeiten, falls vorhanden
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          # Test-Framework und alle weiteren Pakete, die deine Tests brauchen
-          pip install pytest fastapi requests httpx PyJWT joblib mlflow
+      - name: Run tests container
+        # führt den 'tests'-Service aus, der in deinem docker-compose.yml bereits alle pytest-Befehle enthält
+        run: docker-compose up --abort-on-container-exit --exit-code-from tests
 
-      - name: Run pytest
-        run: pytest -q
+      - name: Tear down
+        if: always()
+        run: docker-compose down --volumes --remove-orphans
 
-  detect-changes:
-    name: Detect changed services
-    runs-on: ubuntu-latest
-    #needs: test
-    outputs:
-      services: ${{ steps.set-services.outputs.services }}
-    steps:
-      - name: Checkout full history
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Determine changed services
-        id: set-services
-        run: |
-          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
-          echo "Changed files: $CHANGED"
-
-          services=()
-          if echo "$CHANGED" | grep -qE '^dockerfiles/auth_service/|^plugins/cd4ml/inference/auth_service'; then
-            services+=('"auth_service"')
-          fi
-          if echo "$CHANGED" | grep -qE '^dockerfiles/predict_service/|^plugins/cd4ml/inference/predict_service'; then
-            services+=('"predict_service"')
-          fi
-
-          if [ ${#services[@]} -eq 0 ]; then
-            echo "services=[]" >> $GITHUB_OUTPUT
-          else
-            echo "services=[${services[*]}]" >> $GITHUB_OUTPUT
-          fi
-
-  build-and-push:
-    name: Build & Push Docker Images
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.services != '[]' }}
+  publish:
+    name: Build & Push Changed Docker Images
+    needs: e2e-test
+    if: ${{ needs.e2e-test.result == 'success' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
+        service: [ auth_service, predict_service ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
