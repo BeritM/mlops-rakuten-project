@@ -24,10 +24,8 @@ jobs:
           pip install --upgrade pip
           # 1) Projekt-Abhängigkeiten (falls vorhanden)
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          # 2) pytest fürs Test-Framework
-          pip install pytest
-          # 3) fastapi + requests für TestClient
-          pip install fastapi requests
+          # 2) Test-Framework und HTTP-Client
+          pip install pytest fastapi requests httpx
 
       - name: Pull DVC-Daten (optional)
         env:
