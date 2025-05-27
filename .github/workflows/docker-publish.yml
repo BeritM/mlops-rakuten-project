@@ -1,14 +1,11 @@
 name: Build & Push Docker Services
 
-# This workflow is designed to build and push Docker images for various services in a machine learning pipeline.
-# It includes steps for data version control synchronization, preprocessing, model training, validation, testing, and service deployment.
+# Prevent overlapping runs: cancel any in-flight workflow for the same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Trigger for main and develop branches
-# This workflow builds and pushes Docker images for various services in a machine learning pipeline.
-# and just for testing the dev_new-feature-githubactions branch as well, will be dropped after testing.
+# Trigger this workflow on pushes and PRs to main, develop, and our test branch
 on:
   push:
     branches: [ main, develop, dev_new-feature-githubactions ]
@@ -16,7 +13,7 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  REGISTRY: ghcr.io
+  REGISTRY: ghcr.io               # GitHub Container Registry
   IMAGE_PREFIX: ${{ github.repository }}
 
 jobs:
@@ -29,15 +26,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
+      - name: Generate image metadata
+        id: meta-dvc
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-dvc-sync
@@ -51,11 +48,11 @@ jobs:
           context: .
           file: dockerfiles/dvc/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta-dvc.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # 2) preprocessing (nach dvc-sync)
+  # 2) preprocessing (after dvc-sync)
   preprocessing:
     runs-on: ubuntu-latest
     needs: dvc-sync
@@ -65,15 +62,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
+      - name: Generate image metadata
+        id: meta-pre
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-preprocessing
@@ -87,7 +84,7 @@ jobs:
           context: .
           file: dockerfiles/preprocessing/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta-pre.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -101,15 +98,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
+      - name: Generate image metadata
+        id: meta-train
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-training
@@ -123,7 +120,7 @@ jobs:
           context: .
           file: dockerfiles/model_training/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta-train.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -137,15 +134,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
-        id: meta
+      - name: Generate image metadata
+        id: meta-validate
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-validation
@@ -159,7 +156,7 @@ jobs:
           context: .
           file: dockerfiles/model_validation/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.meta-validate.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -170,45 +167,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create shared_volume directory      # ensure your mount exists to avoid errors 
+      - name: Install Docker Compose plugin        # required for `docker compose` commands
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose-plugin
+
+      - name: Create shared_volume directory       # ensure the mount target exists
         run: mkdir -p shared_volume
 
-      - name: Build tests image                    # build the tests service locally 
-        run: docker-compose build tests
+      - name: Build tests image locally            # build the tests service without pushing
+        run: docker compose build tests
 
-      - name: Log in to registry
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull required images
+      - name: Pull pipeline images                 # bring in dvc-sync & model-validation
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-dvc-sync:latest
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-validation:latest
 
-      - name: Run tests via Docker Compose
-        run: docker-compose run --rm tests
+      - name: Run tests via Docker Compose         # execute the test suite
+        run: docker compose run --rm tests
 
-  # Build & push auth_service image
+  # 6) auth_service (after tests)
   auth_service:
     runs-on: ubuntu-latest
-    needs: tests  # ensure data pipeline and tests passed first
+    needs: tests
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx              # prepare the new build infrastructure
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to registry               # authenticate before push
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
+      - name: Generate image metadata
         id: meta-auth
         uses: docker/metadata-action@v5
         with:
@@ -217,7 +219,7 @@ jobs:
             type=ref,event=branch
             type=semver,pattern=v*.*.*
 
-      - name: Build & push auth_service image  # build & publish auth_service
+      - name: Build & push auth_service image       # build & publish auth_service
         uses: docker/build-push-action@v3
         with:
           context: .
@@ -227,26 +229,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Build & push predict_service image
+  # 7) predict_service (after auth_service & dvc-sync)
   predict_service:
     runs-on: ubuntu-latest
     needs:
-      - auth_service      # wait for auth_service image
-      - dvc-sync          # ensure data cache image is available
+      - auth_service
+      - dvc-sync
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx               # initialize Buildx for predict_service
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to registry                 # login for push permission
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
+      - name: Generate image metadata
         id: meta-predict
         uses: docker/metadata-action@v5
         with:
@@ -255,7 +257,7 @@ jobs:
             type=ref,event=branch
             type=semver,pattern=v*.*.*
 
-      - name: Build & push predict_service image # build & publish predict_service
+      - name: Build & push predict_service image    # build & publish predict_service
         uses: docker/build-push-action@v3
         with:
           context: .
