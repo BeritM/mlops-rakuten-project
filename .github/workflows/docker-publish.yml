@@ -9,15 +9,11 @@ on:
 
 jobs:
   test:
-    name: Unit Tests
+    name: Run pytest
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Create predict_api alias for tests
-        run: |
-          echo "from plugins.cd4ml.inference.predict_service import predict_app, SECRET_KEY, ALGORITHM" > predict_api.py
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -27,35 +23,18 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
+          # falls du ein requirements.txt hast
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # pytest + alle nötigen Test-Dependencies
           pip install pytest fastapi requests httpx PyJWT
 
-      - name: Pull DVC-Daten (optional)
-        env:
-          DVC_TOKEN: ${{ secrets.DAGSHUB_USER_TOKEN }}
-          DVC_OWNER: ${{ secrets.DAGSHUB_REPO_OWNER }}
-          DVC_REPO: ${{ secrets.DAGSHUB_REPO_NAME }}
-        run: |
-          if [ -n "$DVC_TOKEN" ]; then
-            pip install "dvc[datascience]"
-            export DAGSHUB_USER_TOKEN=$DVC_TOKEN
-            export DAGSHUB_REPO_OWNER=$DVC_OWNER
-            export DAGSHUB_REPO_NAME=$DVC_REPO
-            dvc pull --force
-          else
-            echo "No DVC token, skipping pull."
-          fi
+      - name: Run tests
+        run: pytest -v
 
-      - name: Run pytest
-        run: pytest plugins/cd4ml/tests/test_predict_service.py -v -rA
-
-  publish:
+  build-and-push:
     name: Build & Push Docker Images
     needs: test
     runs-on: ubuntu-latest
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     strategy:
       matrix:
         service: [ auth_service, predict_service ]
@@ -66,8 +45,8 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & push ${{ matrix.service }}
         uses: docker/build-push-action@v4
@@ -76,5 +55,5 @@ jobs:
           file: dockerfiles/${{ matrix.service }}/Dockerfile
           push: true
           tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/${{ matrix.service }}:latest
-            ${{ env.DOCKERHUB_USERNAME }}/${{ matrix.service }}:${{ github.sha }}
+            igurstein/rakuten_dev:${{ matrix.service }}-latest
+            igurstein/rakuten_dev:${{ matrix.service }}-${{ github.sha }}
