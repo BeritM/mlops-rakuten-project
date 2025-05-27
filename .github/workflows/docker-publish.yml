@@ -1,6 +1,6 @@
 name: "CI/CD: Test, Build & Push Docker Images"
 
-# Only one run per branch at a time
+# Ensure only one concurrent run per branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -11,11 +11,11 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  IMAGE_NAME: igurstein/rakuten_dev
-  TAG: ${{ github.sha }}
+  IMAGE_NAME: igurstein/rakuten_dev    # your DockerHub repo
+  TAG: ${{ github.sha }}               # immutable commit-specific tag
 
 jobs:
-  # 1) Run pure-Python unit tests in a venv
+  # 1) Run pure-Python unit tests in a virtualenv
   test-venv:
     name: Run unit tests in virtualenv
     runs-on: ubuntu-latest
@@ -28,17 +28,25 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Create & activate venv
+      - name: Create virtualenv & install deps
         run: |
           python -m venv .venv
-          source .venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          echo "Upgrading pip & setuptools"
+          .venv/bin/pip install --upgrade pip setuptools
+          echo "Installing project requirements"
+          if [ -f requirements.txt ]; then
+            .venv/bin/pip install -r requirements.txt
+          else
+            echo "No requirements.txt found, installing pytest only"
+            .venv/bin/pip install pytest
+          fi
+          echo "Installed packages:"
+          .venv/bin/pip list
 
-      - name: Run pytest suite
+      - name: Run tests
         run: |
-          source .venv/bin/activate
-          pytest -q
+          echo "Running pytest..."
+          .venv/bin/pytest -vv
 
   # 2) Rebuild only those Docker services whose code changed
   rebuild-images:
@@ -66,19 +74,19 @@ jobs:
           CHANGED=$(git diff --name-only ${{ github.sha }} ${{ github.sha }}^ \
             | cut -d/ -f1 \
             | sort -u \
-            | grep -E '^(dockerfiles|plugins|services|dvc-sync|preprocessing|model_training|model_validation|tests|auth_service|predict_service)$' \
+            | grep -E '^(dockerfiles|plugins|dvc-sync|preprocessing|model_training|model_validation|tests|auth_service|predict_service)$' \
             || echo "")
           # Map changed dirs to compose service names
           SERVICES=""
           for D in $CHANGED; do
             case "$D" in
-              dockerfiles/dvc)       SERVICES="$SERVICES dvc-sync";;
-              dockerfiles/preprocessing) SERVICES="$SERVICES preprocessing";;
-              dockerfiles/model_training) SERVICES="$SERVICES model_training";;
+              dockerfiles/dvc)             SERVICES="$SERVICES dvc-sync";;
+              dockerfiles/preprocessing)    SERVICES="$SERVICES preprocessing";;
+              dockerfiles/model_training)   SERVICES="$SERVICES model_training";;
               dockerfiles/model_validation) SERVICES="$SERVICES model_validation";;
-              dockerfiles/tests)     SERVICES="$SERVICES tests";;
-              dockerfiles/auth_service) SERVICES="$SERVICES auth_service";;
-              dockerfiles/predict_service) SERVICES="$SERVICES predict_service";;
+              dockerfiles/tests)            SERVICES="$SERVICES tests";;
+              dockerfiles/auth_service)     SERVICES="$SERVICES auth_service";;
+              dockerfiles/predict_service)  SERVICES="$SERVICES predict_service";;
             esac
           done
           # If none matched, build all
