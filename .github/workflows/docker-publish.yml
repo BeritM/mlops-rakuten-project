@@ -42,7 +42,7 @@ jobs:
           fi
 
           echo "Installing test-only dependencies"
-          .venv/bin/pip install pytest joblib fastapi httpx
+          .venv/bin/pip install pytest joblib fastapi httpx mlflow PyJWT
 
           echo "Installed packages:"
           .venv/bin/pip list
