@@ -25,7 +25,7 @@ jobs:
           # 1) Projekt-Abhängigkeiten (falls vorhanden)
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           # 2) Test-Framework und HTTP-Client
-          pip install pytest fastapi requests httpx
+          pip install pytest fastapi requests httpx PyJWT
 
       - name: Pull DVC-Daten (optional)
         env:
