@@ -27,19 +27,22 @@ jobs:
       - name: Create CI override (DVC Pull & stub others)
         run: |
           cat > docker-compose.ci.yml << 'EOF'
-          version: '3.8'
           services:
             dvc-sync:
+              # .env mit DAGSHUB_TOKEN einlesen
+              env_file:
+                - .env
               command: >
                 sh -c "
-                  # configure Dagshub-Remote und ziehe Daten & Modell
-                  dvc remote add -f dagshub https://dagshub.com/BeritM/mlops-rakuten-project.dvc &&
+                  dvc remote add -f dagshub https://dagshub.com/OWNER/REPO.dvc &&
                   dvc remote modify dagshub auth token \$DAGSHUB_TOKEN &&
                   dvc pull --quiet --jobs \$(nproc)
                 "
+              # Bind-Mount auf GitHub-Runner-Verzeichnisse
               volumes:
-                - shared_volume/data:/app/data
-                - shared_volume/models:/app/models
+                - ./shared_volume/data:/app/data
+                - ./shared_volume/models:/app/models:ro
+
             preprocessing:
               command: ["sh", "-c", "echo 'Skipping preprocessing in CI'"]
             model_training:
