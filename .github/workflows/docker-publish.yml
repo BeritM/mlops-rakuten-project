@@ -1,68 +1,23 @@
-name: "CI/CD: Test, Build & Push Docker Images"
+name: CI/CD: Build, Test & Push Docker Images
 
-# Ensure only one concurrent run per branch
+# Prevent overlapping runs on the same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Trigger on pushes to main, develop, and our test branch
+# Trigger on pushes to main and develop
 on:
   push:
-    branches: [ main, develop, dev_new-feature-githubactions ]
+    branches: [ main, develop ]
 
 env:
-  IMAGE_NAME: igurstein/rakuten_dev    # your DockerHub repo
-  TAG: ${{ github.sha }}               # immutable commit-specific tag
+  IMAGE_NAME: igurstein/rakuten_dev   
+  TAG: ${{ github.sha }}         
 
 jobs:
-# 1) Run Python tests & DVC steps in a virtualenv
-  test-venv:
-    name: Run DVC sync & unit tests in virtualenv
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up AWS credentials         
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-1                 
-
-      - name: Set up Python 3.x
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      - name: Create virtualenv & install deps
-        run: |
-          python -m venv .venv
-          .venv/bin/pip install --upgrade pip setuptools
-          if [ -f requirements.txt ]; then
-            .venv/bin/pip install -r requirements.txt
-          fi
-          .venv/bin/pip install pytest joblib fastapi httpx mlflow PyJWT "dvc[s3]"
-
-      - name: Pull data via DVC
-        run: |
-          echo "Running dvc pull --force"
-          .venv/bin/dvc pull --force
-
-      - name: Run pytest suite
-        run: |
-          echo "Running pytest for predict service"
-          .venv/bin/pytest plugins/cd4ml/tests/test_predict_service.py -v -rA
-
-      - name: Push artifacts via DVC
-        run: |
-          echo "Running dvc push"
-          .venv/bin/dvc push
-
-  # 2) Rebuild only those Docker services whose code changed
-  rebuild-images:
-    name: Build changed Docker service images
-    needs: test-venv
+  # 1) Rebuild all Docker service images and run unit tests
+  build-and-test:
+    name: Build images & run tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -78,46 +33,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Determine changed services
-        id: services
-        run: |
-          CHANGED=$(git diff --name-only ${{ github.sha }} ${{ github.sha }}^ \
-            | cut -d/ -f1 \
-            | sort -u \
-            | grep -E '^(dockerfiles|plugins|dvc-sync|preprocessing|model_training|model_validation|tests|auth_service|predict_service)$' \
-            || echo "")
-          SERVICES=""
-          for D in $CHANGED; do
-            case "$D" in
-              dockerfiles/dvc)             SERVICES="$SERVICES dvc-sync";;
-              dockerfiles/preprocessing)    SERVICES="$SERVICES preprocessing";;
-              dockerfiles/model_training)   SERVICES="$SERVICES model_training";;
-              dockerfiles/model_validation) SERVICES="$SERVICES model_validation";;
-              dockerfiles/tests)            SERVICES="$SERVICES tests";;
-              dockerfiles/auth_service)     SERVICES="$SERVICES auth_service";;
-              dockerfiles/predict_service)  SERVICES="$SERVICES predict_service";;
-            esac
-          done
-          if [ -z "$SERVICES" ]; then
-            echo "No service-specific changes detected; building all."
-            echo "::set-output name=list::"
-          else
-            echo "Building these services:$SERVICES"
-            echo "::set-output name=list::$SERVICES"
-          fi
+      - name: Build all service images
+        run: docker compose build
 
-      - name: Build changed images
-        run: |
-          if [ -z "${{ steps.services.outputs.list }}" ]; then
-            docker compose build
-          else
-            docker compose build ${{ steps.services.outputs.list }}
-          fi
+      - name: Run unit tests
+        run: docker compose run --rm tests
 
-  # 3) Push rebuilt images to DockerHub
+  # 2) Push rebuilt images to DockerHub
   push-image:
-    name: Push images to DockerHub (dev & SHA tags)
-    needs: rebuild-images
+    name: Push images to DockerHub
+    needs: build-and-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
