@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   e2e-test:
-    name: Run tests via Docker Compose
+    name: Run tests via Docker Compose (skip DVC sync)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -20,23 +20,36 @@ jobs:
 
       - name: Prepare .env and shared_volume
         run: |
-          # Create empty .env so docker compose env_file nicht fehlt
           touch .env
-          # Create dummy folders for shared_volume to satisfy Dockerfile cp-commands
           mkdir -p shared_volume/data shared_volume/models
+
+      - name: Create CI override to skip DVC sync
+        run: |
+          cat > docker-compose.ci.yml << 'EOF'
+          version: '3.8'
+          services:
+            dvc-sync:
+              command: ["sh", "-c", "echo 'Skipping DVC sync in CI'"]
+          EOF
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build all services
-        run: docker compose build
+      - name: Build all services (with override)
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml build
 
-      - name: Run tests container
-        run: docker compose up --abort-on-container-exit --exit-code-from tests
+      - name: Run tests container (with override)
+        run: docker compose \
+               -f docker-compose.yml \
+               -f docker-compose.ci.yml \
+               up --abort-on-container-exit --exit-code-from tests
 
       - name: Tear down
         if: always()
-        run: docker compose down --volumes --remove-orphans
+        run: docker compose \
+               -f docker-compose.yml \
+               -f docker-compose.ci.yml \
+               down --volumes --remove-orphans
 
   detect-changes:
     name: Detect changed services
@@ -45,7 +58,7 @@ jobs:
     outputs:
       services: ${{ steps.set-services.outputs.services }}
     steps:
-      - name: Full checkout
+      - name: Checkout full history
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
