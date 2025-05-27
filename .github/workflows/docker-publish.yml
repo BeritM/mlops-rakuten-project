@@ -22,9 +22,12 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
+          # Install pytest (für Test-Ausführung)
+          pip install pytest
+          # Falls du ein requirements.txt hast, installiere zusätzlich alle Abhängigkeiten
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Pull DVC-Daten
+      - name: Pull DVC-Daten (optional)
         env:
           DVC_TOKEN: ${{ secrets.DAGSHUB_USER_TOKEN }}
           DVC_OWNER: ${{ secrets.DAGSHUB_REPO_OWNER }}
