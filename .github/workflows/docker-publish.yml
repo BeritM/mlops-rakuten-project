@@ -22,10 +22,12 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          # Install pytest (für Test-Ausführung)
-          pip install pytest
-          # Falls du ein requirements.txt hast, installiere zusätzlich alle Abhängigkeiten
+          # 1) Projekt-Abhängigkeiten (falls vorhanden)
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # 2) pytest fürs Test-Framework
+          pip install pytest
+          # 3) fastapi + requests für TestClient
+          pip install fastapi requests
 
       - name: Pull DVC-Daten (optional)
         env:
