@@ -10,7 +10,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # copy requirements.txt
-COPY dockerfiles/inference/requirements.txt .
+COPY dockerfiles/auth_service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
