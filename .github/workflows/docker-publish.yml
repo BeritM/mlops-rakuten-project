@@ -7,9 +7,12 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 
+permissions:
+  contents: read
+
 jobs:
   test:
-    name: Run pytest
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -20,24 +23,64 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install dependencies
+      - name: Install test dependencies
         run: |
           pip install --upgrade pip
-          # falls du ein requirements.txt hast
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          # pytest + alle nötigen Test-Dependencies
-          pip install pytest fastapi requests httpx PyJWT
+          # falls du ein requirements-dev.txt hast:
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          # pytest & Bibliotheken für deine Tests
+          pip install pytest fastapi requests httpx PyJWT joblib
 
-      - name: Run tests
-        run: pytest -v
+      - name: Run pytest
+        run: pytest -q
+
+  detect-changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      services: ${{ steps.set-services.outputs.services }}
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Determine changed services
+        id: set-services
+        run: |
+          # Liste aller geänderten Dateien zwischen vorherigem und aktuellem Commit
+          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          echo "Changed files: $CHANGED"
+
+          services=()
+          # Auth-Service, wenn Dockerfile oder Code geändert wurde
+          if echo "$CHANGED" | grep -qE '^dockerfiles/auth_service/' \
+            || echo "$CHANGED" | grep -qE '^plugins/cd4ml/inference/auth_service'; then
+            services+=('"auth_service"')
+          fi
+          # Predict-Service
+          if echo "$CHANGED" | grep -qE '^dockerfiles/predict_service/' \
+            || echo "$CHANGED" | grep -qE '^plugins/cd4ml/inference/predict_service'; then
+            services+=('"predict_service"')
+          fi
+
+          # Gib ein JSON-Array aus (oder [] wenn nichts)
+          if [ ${#services[@]} -eq 0 ]; then
+            echo "services=[]" >> $GITHUB_OUTPUT
+          else
+            echo "services=[${services[*]}]" >> $GITHUB_OUTPUT
+          fi
 
   build-and-push:
     name: Build & Push Docker Images
-    needs: test
+    needs: detect-changes
     runs-on: ubuntu-latest
+    # Nur ausführen, wenn mindestens ein Service im JSON-Array steht
+    if: ${{ needs.detect-changes.outputs.services != '[]' }}
     strategy:
       matrix:
-        service: [ auth_service, predict_service ]
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
