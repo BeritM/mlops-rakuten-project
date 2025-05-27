@@ -194,7 +194,8 @@ jobs:
   # 6) auth_service (after tests)
   auth_service:
     runs-on: ubuntu-latest
-    needs: tests
+    # needs: tests
+    needs: model_validation
     steps:
       - uses: actions/checkout@v4
 
