@@ -1,6 +1,6 @@
-name: CI/CD: Test, Build & Push Docker Images
+name: "CI/CD: Test, Build & Push Docker Images"
 
-# Ensure only one concurrent run per branch
+# Only one run per branch at a time
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -11,8 +11,8 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  IMAGE_NAME: igurstein/rakuten_dev          
-  TAG: ${{ github.sha }}                     # immutable commit-specific tag
+  IMAGE_NAME: igurstein/rakuten_dev
+  TAG: ${{ github.sha }}
 
 jobs:
   # 1) Run pure-Python unit tests in a venv
