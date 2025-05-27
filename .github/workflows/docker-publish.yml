@@ -15,13 +15,20 @@ env:
   TAG: ${{ github.sha }}               # immutable commit-specific tag
 
 jobs:
-  # 1) Run Python tests & DVC steps in a virtualenv
+# 1) Run Python tests & DVC steps in a virtualenv
   test-venv:
     name: Run DVC sync & unit tests in virtualenv
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up AWS credentials         
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1                 
 
       - name: Set up Python 3.x
         uses: actions/setup-python@v4
@@ -31,22 +38,11 @@ jobs:
       - name: Create virtualenv & install deps
         run: |
           python -m venv .venv
-          echo "Upgrading pip & setuptools"
           .venv/bin/pip install --upgrade pip setuptools
-
-          echo "Installing project requirements"
           if [ -f requirements.txt ]; then
             .venv/bin/pip install -r requirements.txt
-          else
-            echo "No requirements.txt found."
           fi
-
-          echo "Installing test-only dependencies"
-          # include dvc[s3] so S3 remotes work
           .venv/bin/pip install pytest joblib fastapi httpx mlflow PyJWT "dvc[s3]"
-
-          echo "Installed packages:"
-          .venv/bin/pip list
 
       - name: Pull data via DVC
         run: |
