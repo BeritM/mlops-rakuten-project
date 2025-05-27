@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
+
 jobs:
   test:
     name: Unit Tests
@@ -16,9 +17,7 @@ jobs:
 
       - name: Create predict_api alias for tests
         run: |
-          cat << 'EOF' > predict_api.py
-          from plugins.cd4ml.inference.predict_service import predict_app, SECRET_KEY, ALGORITHM
-          EOF
+          echo "from plugins.cd4ml.inference.predict_service import predict_app, SECRET_KEY, ALGORITHM" > predict_api.py
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -28,9 +27,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          # Projekt-Abhängigkeiten, falls vorhanden
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          # Test-Framework & HTTP-Client & JWT
           pip install pytest fastapi requests httpx PyJWT
 
       - name: Pull DVC-Daten (optional)
