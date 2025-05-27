@@ -43,9 +43,13 @@ from pathlib import Path
 from dvc_push_manager import track_and_push_with_retry
 
 from step01_combine_xy import load_combined_data
-from step02_text_cleaning import clean_text
+#from step02_text_cleaning import clean_text
 from step03_split_data import split_dataset
 from step04_tfidf_transform import apply_tfidf
+from preprocessing_core import ProductTypePredictorMLflow # replaces step02_text_cleaning
+
+#from dotenv import load_dotenv
+#load_dotenv()
 
 # ---------- ENV-Variablen ----------
 RAW_DIR  = os.getenv("DATA_RAW_DIR")
@@ -103,12 +107,19 @@ def main():
         print("First few rows:")
         print(df.head())
 
+    # --- OUTDATED CODE ---
+    # --- used for further code correction ---
+    # 2. Clean text using the 'description' column
+    #if "description" not in df.columns:
+    #    raise KeyError("description not found.")
+    #df["cleaned_text"] = df["description"].astype(str).apply(ProductTypePredictorMLflow.clean_text_static)
+    
         # 2. Clean text
         print("\n2. Cleaning text data...")
         if "description" not in df.columns:
             raise KeyError("'description' column not found in dataset")
         
-        df["cleaned_text"] = df["description"].astype(str).apply(clean_text)
+        df["cleaned_text"] = df["description"].astype(str).apply(clean_text)    # clean_text has to be replaced with ProductTypePredictorMLflow.clean_text_static
         print(f"Text cleaning completed. Sample cleaned text: {df['cleaned_text'].iloc[0][:100]}...")
 
         # 3. Train/Validate/Test Split
