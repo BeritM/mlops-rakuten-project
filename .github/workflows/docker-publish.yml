@@ -8,11 +8,13 @@ concurrency:
 # Trigger on pushes to main and develop
 on:
   push:
-    branches: [ main, develop ]
+    branches:
+      - main
+      - develop
 
 env:
-  IMAGE_NAME: igurstein/rakuten_dev   
-  TAG: ${{ github.sha }}         
+  IMAGE_NAME: igurstein/rakuten_dev  
+  TAG: ${{ github.sha }}              
 
 jobs:
   # 1) Rebuild all Docker service images and run unit tests
