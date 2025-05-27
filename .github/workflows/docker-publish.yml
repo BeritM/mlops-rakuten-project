@@ -1,267 +1,127 @@
-name: Build & Push Docker Services
+name: CI/CD: Test, Build & Push Docker Images
 
-# Prevent overlapping runs: cancel any in-flight workflow for the same branch
-concurrency: # This ensures only one workflow runs at a time for the same branch
+# Ensure only one concurrent run per branch
+concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Trigger this workflow on pushes and PRs to main, develop, and our test branch GithubActions
+# Trigger on pushes to main, develop, and our test branch
 on:
   push:
     branches: [ main, develop, dev_new-feature-githubactions ]
-  pull_request:
-    branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  REGISTRY: ghcr.io               # GitHub Container Registry
-  IMAGE_PREFIX: ${{ github.repository }}
+  IMAGE_NAME: igurstein/rakuten_dev          
+  TAG: ${{ github.sha }}                     # immutable commit-specific tag
 
 jobs:
-  # 1) dvc-sync
-  dvc-sync:
+  # 1) Run pure-Python unit tests in a venv
+  test-venv:
+    name: Run unit tests in virtualenv
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+      - name: Set up Python 3.x
+        uses: actions/setup-python@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          python-version: '3.x'
 
-      - name: Generate image metadata
-        id: meta-dvc
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-dvc-sync
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern=v*.*.*
-
-      - name: Build & push dvc-sync image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/dvc/Dockerfile
-          push: true
-          tags: ${{ steps.meta-dvc.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # 2) preprocessing (after dvc-sync)
-  preprocessing:
-    runs-on: ubuntu-latest
-    needs: dvc-sync
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate image metadata
-        id: meta-pre
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-preprocessing
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern=v*.*.*
-
-      - name: Build & push preprocessing image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/preprocessing/Dockerfile
-          push: true
-          tags: ${{ steps.meta-pre.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # 3) model_training (after preprocessing)
-  model_training:
-    runs-on: ubuntu-latest
-    needs: preprocessing
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate image metadata
-        id: meta-train
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-training
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern=v*.*.*
-
-      - name: Build & push model_training image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/model_training/Dockerfile
-          push: true
-          tags: ${{ steps.meta-train.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # 4) model_validation (after model_training)
-  model_validation:
-    runs-on: ubuntu-latest
-    needs: model_training
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate image metadata
-        id: meta-validate
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-validation
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern=v*.*.*
-
-      - name: Build & push model_validation image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/model_validation/Dockerfile
-          push: true
-          tags: ${{ steps.meta-validate.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # 5) tests (after model_validation)
-  tests:
-    runs-on: ubuntu-latest
-    needs: model_validation
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Compose
-        uses: docker/compose-action@v1.0.3
-
-      - name: Create shared_volume directory  # ensure the mount target exists
-        run: mkdir -p shared_volume
-
-      - name: Build tests image locally       # build the tests service without pushing
-        run: docker compose build tests
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull pipeline images            # bring in dvc-sync & model-validation
+      - name: Create & activate venv
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-dvc-sync:latest
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-validation:latest
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run tests via Docker Compose    # execute the test suite inside the built image
-        run: docker compose run --rm tests
+      - name: Run pytest suite
+        run: |
+          source .venv/bin/activate
+          pytest -q
 
-  # 6) auth_service (after tests)
-  auth_service:
+  # 2) Rebuild only those Docker services whose code changed
+  rebuild-images:
+    name: Build changed Docker service images
+    needs: test-venv
     runs-on: ubuntu-latest
-    # needs: tests
-    needs: model_validation
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to DockerHub
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Generate image metadata
-        id: meta-auth
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-auth-service
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern=v*.*.*
+      - name: Determine changed services
+        id: services
+        run: |
+          # List top-level directories changed in the last commit
+          CHANGED=$(git diff --name-only ${{ github.sha }} ${{ github.sha }}^ \
+            | cut -d/ -f1 \
+            | sort -u \
+            | grep -E '^(dockerfiles|plugins|services|dvc-sync|preprocessing|model_training|model_validation|tests|auth_service|predict_service)$' \
+            || echo "")
+          # Map changed dirs to compose service names
+          SERVICES=""
+          for D in $CHANGED; do
+            case "$D" in
+              dockerfiles/dvc)       SERVICES="$SERVICES dvc-sync";;
+              dockerfiles/preprocessing) SERVICES="$SERVICES preprocessing";;
+              dockerfiles/model_training) SERVICES="$SERVICES model_training";;
+              dockerfiles/model_validation) SERVICES="$SERVICES model_validation";;
+              dockerfiles/tests)     SERVICES="$SERVICES tests";;
+              dockerfiles/auth_service) SERVICES="$SERVICES auth_service";;
+              dockerfiles/predict_service) SERVICES="$SERVICES predict_service";;
+            esac
+          done
+          # If none matched, build all
+          if [ -z "$SERVICES" ]; then
+            echo "No service-specific changes detected; building all."
+            echo "::set-output name=list::"
+          else
+            echo "Building these services:$SERVICES"
+            echo "::set-output name=list::$SERVICES"
+          fi
 
-      - name: Build & push auth_service image       # build & publish auth_service
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/auth_service/Dockerfile
-          push: true
-          tags: ${{ steps.meta-auth.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build changed images
+        run: |
+          if [ -z "${{ steps.services.outputs.list }}" ]; then
+            docker compose build
+          else
+            docker compose build ${{ steps.services.outputs.list }}
+          fi
 
-  # 7) predict_service (after auth_service & dvc-sync)
-  predict_service:
+  # 3) Push rebuilt images to DockerHub
+  push-image:
+    name: Push images to DockerHub (dev & SHA tags)
+    needs: rebuild-images
     runs-on: ubuntu-latest
-    needs:
-      - auth_service
-      - dvc-sync
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate image metadata
-        id: meta-predict
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-predict-service
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern=v*.*.*
-
-      - name: Build & push predict_service image    # build & publish predict_service
+      - name: Build & push images
         uses: docker/build-push-action@v3
         with:
           context: .
-          file: dockerfiles/predict_service/Dockerfile
           push: true
-          tags: ${{ steps.meta-predict.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.IMAGE_NAME }}:dev
+            ${{ env.IMAGE_NAME }}:${{ env.TAG }}
