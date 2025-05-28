@@ -1,105 +1,65 @@
-name: CI – Build, Test & Push Docker Image
+name: Build, Test & Push Docker Images
 
+# Trigger
 on:
   push:
     branches:
-      - main 
-      - delevop
+      - main
+      - develop
       - dev_new-feature-githubactions
 
-permissions:
-  contents: read
-  packages: write  # für Docker-Push
-
+# Verhindere parallele Runs desselben Service+Branch
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: build-${{ matrix.service }}-${{ github.ref_name }}
   cancel-in-progress: true
 
+# Erlaubnisse (standardmäßig reicht contents: read für checkout;
+# packages: write nur nötig, wenn du GHCR/Packages nutzen würdest)
+permissions:
+  contents: read
+
 jobs:
-  # 1. Unit Tests als eigenständiger Job
-  unit-tests:
-    name: Run Unit Tests
+  build-test-push:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth_service, predict_service]
+
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Install prod requirements files
-        run: |
-          python -m pip install --upgrade pip
-          # nur Dateien, die exakt "requirements.txt" heißen
-          find . -type f -name 'requirements.txt' | while read reqfile; do
-            echo "🔍 Installing from $reqfile"
-            pip install -r "$reqfile"
-          done
-
-      - name: Run pytest
-        run: pytest --maxfail=1 --disable-warnings -q
-
-  # 2. Build & Test Docker-Image
-  build-and-test:
-    name: Build & Test Docker Image
-    needs: unit-tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-        with:
-          buildkitd-flags: --debug
-
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
-      - name: Build image
-        run: |
-          docker buildx build \
-            --cache-to type=local,dest=/tmp/.buildx-cache-new \
-            --cache-from type=local,src=/tmp/.buildx-cache \
-            --load \
-            -t igurstein/rakuten_dev:${{ github.sha }} \
-            .
-
-      - name: Save cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
-
-      - name: Smoke test container
-        run: |
-          docker run --rm igurstein/rakuten_dev:${{ github.sha }} \
-            sh -c "pytest --maxfail=1 --disable-warnings -q tests/integration"
-
-  # 3. Push only if build-and-test succeeded
-  push:
-    name: Push Docker Image
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: ${{ needs.build-and-test.result == 'success' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Push image
+      - name: Build ${{ matrix.service }}
         run: |
-          docker tag igurstein/rakuten_dev:${{ github.sha }} igurstein/rakuten_dev:latest
-          docker push igurstein/rakuten_dev:${{ github.sha }}
-          docker push igurstein/rakuten_dev:latest
+          docker build \
+            -f dockerfiles/${{ matrix.service }}/Dockerfile \
+            -t igurstein/rakuten_dev:${{ matrix.service }}-${{ github.ref_name }} \
+            .
+
+      - name: Run unit tests for ${{ matrix.service }}
+        run: |
+          docker run --rm igurstein/rakuten_dev:${{ matrix.service }}-${{ github.ref_name }} \
+            sh -c "pytest plugins/cd4ml/tests/${{ matrix.service }} -v -rA"
+
+      - name: Push ${{ matrix.service }} to Docker Hub
+        run: |
+          docker push igurstein/rakuten_dev:${{ matrix.service }}-${{ github.ref_name }}
+
+      - name: Tag ${{ matrix.service }} as latest
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker tag \
+            igurstein/rakuten_dev:${{ matrix.service }}-main \
+            igurstein/rakuten_dev:${{ matrix.service }}-latest
+          docker push igurstein/rakuten_dev:${{ matrix.service }}-latest
