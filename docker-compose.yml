@@ -1,8 +1,8 @@
 services:
   dvc-sync:
     build:
-      context: ./dockerfiles/dvc
-      dockerfile: Dockerfile
+      context: "./dockerfiles/dvc"
+      dockerfile: "Dockerfile"
     volumes:
       - .:/app
       - dvc-cache:/app/.dvc/cache
@@ -15,8 +15,8 @@ services:
   
   preprocessing:
     build:
-      context: .
-      dockerfile: dockerfiles/preprocessing/Dockerfile
+      context: "."
+      dockerfile: "dockerfiles/preprocessing/Dockerfile"
     volumes:
       - .:/app
       - dvc-cache:/app/.dvc/cache
@@ -61,8 +61,8 @@ services:
   
   model_validation:
     build:
-      context: .
-      dockerfile: dockerfiles/model_validation/Dockerfile
+      context: "."
+      dockerfile: "dockerfiles/model_validation/Dockerfile"
     volumes:
       - .:/app
       - dvc-cache:/app/.dvc/cache
@@ -99,27 +99,45 @@ services:
       dvc-sync:
         condition: service_completed_successfully
     command: >
-      sh -c "dvc pull --force && pytest plugins/cd4ml/tests/test_inference.py -v -rA && dvc push"
-  
-  inference:
+      sh -c "dvc pull --force && pytest plugins/cd4ml/tests/test_predict_service.py -v -rA && dvc push"
+
+  auth_service:
     build:
-      context: .
-      dockerfile: dockerfiles/inference/Dockerfile
+      context: "."
+      dockerfile: "dockerfiles/auth_service/Dockerfile"
+    env_file:
+      - .env
     ports:
-      - "8000:8000"
+      - "8001:8001"
+    command: ["uvicorn", "plugins.cd4ml.inference.auth_service:auth_app", "--host", "0.0.0.0", "--port", "8001"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  predict_service:
+    build:
+      context: "."
+      dockerfile: "dockerfiles/predict_service/Dockerfile"
+    env_file:
+      - .env
+    ports:
+      - "8002:8002"
     volumes:
       - .:/app
       - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
       - dvc-cache:/app/.dvc/cache
+      - ./shared_volume/data:/app/data
+      - ./shared_volume/models:/app/models
     working_dir: /app
-    env_file:
-      - .env
     depends_on:
-      model_validation:
-        condition: service_completed_successfully
+      auth_service:
+        condition: service_healthy
       dvc-sync:
         condition: service_completed_successfully
-    command: ["uvicorn", "plugins.cd4ml.inference.infer:app", "--host", "0.0.0.0", "--port", "8000"]
+    command: ["uvicorn", "plugins.cd4ml.inference.predict_service:predict_app", "--host", "0.0.0.0", "--port", "8002"]
+  
 
 volumes:
   dvc-cache:

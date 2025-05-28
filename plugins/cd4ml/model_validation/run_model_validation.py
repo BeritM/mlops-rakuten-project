@@ -13,7 +13,7 @@ from mlflow.tracking import MlflowClient
 from dvc_push_manager import track_and_push_with_retry
 
 from model_validation import load_model, prediction_and_metrics, save_txt_file
-from model_training import load_train_data
+from plugins.cd4ml.model_training.model_training import load_train_data
 
 # ---------- Pfade ----------
 INPUT_DIR  = os.getenv("DATA_PROCESSED_DIR")

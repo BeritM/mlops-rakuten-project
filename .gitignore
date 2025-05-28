@@ -6,9 +6,11 @@
 # Data files managed by DVC
 shared_volume/data/raw
 shared_volume/data/processed
+shared_volume/data/feedback
 shared_volume/models
 !shared_volume/data/raw/.gitkeep
 !shared_volume/data/processed/.gitkeep
+!shared_volume/data/feedback/.gitkeep
 !shared_volume/models/.gitkeep
 
 # Python stuff

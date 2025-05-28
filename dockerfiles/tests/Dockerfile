@@ -11,10 +11,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir "dvc[s3]"
 
 # NLTK-Stopwords
-RUN python -m nltk.downloader stopwords
+RUN python -m nltk.downloader punkt stopwords punkt_tab wordnet
 
 COPY . .
 RUN cp -R shared_volume/data /app/ && cp -R shared_volume/models /app/
 
 # Command
-CMD ["pytest", "plugins/cd4ml/tests/test_inference.py", "-v", "-rA"]
+CMD ["pytest", "plugins/cd4ml/tests/test_predict_service.py", "-v", "-rA"]
