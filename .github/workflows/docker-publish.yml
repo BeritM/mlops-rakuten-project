@@ -15,7 +15,7 @@ jobs:
   build-test-push:
     runs-on: ubuntu-latest
 
-    # pro Service+Branch immer nur einen Lauf gleichzeitig
+    # Pro Service+Branch immer nur ein Lauf gleichzeitig
     concurrency:
       group: build-${{ matrix.service }}-${{ github.ref_name }}
       cancel-in-progress: true
@@ -25,28 +25,29 @@ jobs:
         service: [auth_service, predict_service]
 
     env:
-      # Docker-Hub-Credentials aus den Repository-Secrets
+      # Damit Tests auch deine Module finden
+      PYTHONPATH: ${{ github.workspace }}
+      # Docker Hub Credentials
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
 
     steps:
-      # 1) Code auschecken
+      # 1) Checkout
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2) Python auf dem Runner einrichten
+      # 2) Python auf Runner
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      # 3) Dependencies installieren (inkl. pytest)
-      - name: Install dependencies
+      # 3) Installiere alle Test-Dependencies aus deinem tests/requirements.txt
+      - name: Install test dependencies
         run: |
-          pip install -r requirements.txt
-          pip install pytest
+          pip install -r dockerfiles/tests/requirements.txt
 
-      # 4) Tests auf dem Runner ausführen
+      # 4) Unit-Tests auf dem Runner
       - name: Run unit tests for ${{ matrix.service }}
         run: |
           pytest plugins/cd4ml/tests/${{ matrix.service }} -v -rA
@@ -58,10 +59,9 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_TOKEN }}
 
-      # 6) QEMU + Buildx (optional, Multiplattform)
+      # 6) Optional: QEMU + Buildx (für Multi-Architektur)
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -78,7 +78,7 @@ jobs:
         run: |
           docker push igurstein/rakuten_dev:${{ matrix.service }}-${{ github.ref_name }}
 
-      # 9) optional: latest-Tag auf main
+      # 9) Auf main: Tag als latest
       - name: Tag ${{ matrix.service }} as latest
         if: github.ref == 'refs/heads/main'
         run: |
