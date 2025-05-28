@@ -12,7 +12,6 @@ permissions:
   contents: read
 
 jobs:
-  # 1) Tests auf dem Runner
   test:
     runs-on: ubuntu-latest
     steps:
@@ -30,26 +29,20 @@ jobs:
 
       - name: Run all tests
         run: |
-          pytest dockerfiles/tests -v -rA
+          pytest plugins/cd4ml/tests -v -rA
 
-  # 2) Build & Push Images (erst wenn Tests grün sind)
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
-
-    # Verhindere parallele Runs desselben Service+Branch
     concurrency:
       group: build-${{ matrix.service }}-${{ github.ref_name }}
       cancel-in-progress: true
-
     strategy:
       matrix:
         service: [auth_service, predict_service]
-
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -84,4 +77,3 @@ jobs:
             igurstein/rakuten_dev:${{ matrix.service }}-main \
             igurstein/rakuten_dev:${{ matrix.service }}-latest
           docker push igurstein/rakuten_dev:${{ matrix.service }}-latest
-          
