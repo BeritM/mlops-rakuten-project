@@ -1,6 +1,6 @@
+# .github/workflows/docker-publish.yml
 name: Build, Test & Push Docker Images
 
-# Trigger
 on:
   push:
     branches:
@@ -8,18 +8,16 @@ on:
       - develop
       - dev_new-feature-githubactions
 
-# Verhindere parallele Runs desselben Service+Branch
-concurrency:
-  group: build-${{ matrix.service }}-${{ github.ref_name }}
-  cancel-in-progress: true
-
-# Erlaubnisse (standardmäßig reicht contents: read für checkout;
-# packages: write nur nötig, wenn du GHCR/Packages nutzen würdest)
 permissions:
   contents: read
 
 jobs:
   build-test-push:
+    # Damit pro Service+Branch nur ein Run gleichzeitig läuft
+    concurrency:
+      group: build-${{ matrix.service }}-${{ github.ref_name }}
+      cancel-in-progress: true
+
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -31,6 +29,7 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
