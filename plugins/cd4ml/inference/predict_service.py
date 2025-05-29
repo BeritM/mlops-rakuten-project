@@ -42,14 +42,14 @@ def verify_token(token: str = Header(...)):
 # --- Pydantic Models ---
 class PredictionRequest(BaseModel):
     designation: str
-    description: str
+    description: Optional[str] = None
 
 class PredictionResponse(BaseModel):
     predicted_class: str
 
 class FeedbackEntry(BaseModel):
     designation: str
-    description: str
+    description: Optional[str] = None
     predicted_label: str
     correct_label: str
 
@@ -148,7 +148,8 @@ def get_model_info(user=Depends(verify_token)):
 
 @predict_app.post("/predict", response_model=PredictionResponse)
 def predict_product_type(request: PredictionRequest, user=Depends(verify_token)):
-    prediction = predictor.predict(request.designation, request.description)
+    description_for_prediction = request.description if request.description is not None else ""
+    prediction = predictor.predict(request.designation, description_for_prediction)
     return {"predicted_class": prediction}
 
 @predict_app.post("/feedback")

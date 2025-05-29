@@ -186,17 +186,19 @@ else:
 
     st.subheader("Get Prediction")
     with st.form("prediction_form"):
-        designation = st.text_area("Designation", help="e.g., 'Smartphone XYZ'")
-        description = st.text_area("Description", help="e.g., 'Latest model with 128GB storage and 5G connectivity.'")
+        designation = st.text_area("Designation", help="e.g., 'Voiture miniature 1976 Ford Mustang'")
+        description = st.text_area("Description", help="e.g., 'couleur bleu.'")
         predict_button = st.form_submit_button("Get Prediction")
 
         if predict_button:
-            if designation and description:
+            #if designation and description:
+            if designation: # Allow prediction with designation only    
                 predicted_class = get_prediction(designation, description)
                 if predicted_class:
+                    
                     st.success(f"Predicted Product Class: **{predicted_class}**")
             else:
-                st.warning("Please enter both designation and description.")
+                st.warning("Please enter at least designation.")
 
     st.subheader("Model Information")
     if st.button("Fetch Model Info"):
