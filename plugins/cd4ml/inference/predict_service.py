@@ -98,18 +98,18 @@ def startup():
         print(f"[INFO] Model loaded successfully.")
 
         print(f"[DEBUG] Downloading vectorizer...")
-        # vectorizer_path_dir = client.download_artifacts(run_id=run_id, path="vectorizer")
-        # vectorizer_path = os.path.join(vectorizer_path_dir, "tfidf_vectorizer.pkl")
-        # print(f"[INFO] Vectorizer path: {vectorizer_path}")
-        vectorizer_path = "/app/models/tfidf_vectorizer.pkl"
-        print(f"[INFO] Using local vectorizer: {vectorizer_path}")
+        vectorizer_path_dir = client.download_artifacts(run_id=run_id, path="vectorizer")
+        vectorizer_path = os.path.join(vectorizer_path_dir, "tfidf_vectorizer.pkl")
+        print(f"[INFO] Vectorizer path: {vectorizer_path}")
+        # vectorizer_path = "/app/models/tfidf_vectorizer.pkl"
+        print(f"[INFO] Using remote vectorizer: {vectorizer_path}")
 
         print(f"[DEBUG] Downloading product dictionary...")
-        # product_dict_dir = client.download_artifacts(run_id=run_id, path="product_dictionary")
-        # product_dictionary_path = os.path.join(product_dict_dir, "product_dictionary.pkl")
-        # print(f"[INFO] Product dictionary path: {product_dictionary_path}")
-        product_dictionary_path = "/app/models/product_dictionary.pkl"
-        print(f"[INFO] Using local product dictionary: {product_dictionary_path}")
+        product_dict_dir = client.download_artifacts(run_id=run_id, path="product_dictionary")
+        product_dictionary_path = os.path.join(product_dict_dir, "product_dictionary.pkl")
+        print(f"[INFO] Product dictionary path: {product_dictionary_path}")
+        # product_dictionary_path = "/app/models/product_dictionary.pkl"
+        print(f"[INFO] Using remote product dictionary: {product_dictionary_path}")
 
 
         with open(product_dictionary_path, "rb") as f:
