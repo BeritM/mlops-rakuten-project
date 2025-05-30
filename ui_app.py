@@ -8,6 +8,34 @@ import time
 AUTH_API_BASE_URL = "http://localhost:8001"
 PREDICT_API_BASE_URL = "http://localhost:8002" # Updated to 8002 as per error message
 
+product_dict = {10: 'Used Books', 
+                1940: 'Food', 
+                40: 'Used video games', 
+                2060: 'Crafts & souvenirs', 
+                50: 'Console games accessories', 
+                2220: 'Pet accessories', 
+                60: 'New console games', 
+                2280: 'Magazines & Comics', 
+                1140: 'Action figurines', 
+                2403: 'Books, magazines & collections', 
+                1160: 'Trading card games', 
+                2462: 'Used video games & accessories', 
+                1180: 'Role-playing games', 
+                2522: 'Office Supplies', 
+                1280: 'Childrens toys', 
+                2582: 'Gardening Furniture', 
+                1281: 'Board games', 
+                2583: 'Pool & accessories', 
+                1300: 'Miniature car toys', 
+                2585: 'Gardening tools', 
+                1301: 'Indoor games', 
+                2705: 'New books', 
+                1302: 'Outdoor play', 
+                2905: 'Computer games', 
+                1320: 'Baby care', 
+                2910: 'Household linens', 
+                1560: 'Furniture', 
+                1920: 'Home accessories'}
 # --- Session State Initialization ---
 # Initialize session state variables if they don't already exist.
 # This helps maintain state across Streamlit re-runs.
@@ -36,12 +64,15 @@ if 'selected_category_from_dropdown_index' not in st.session_state: # To control
     st.session_state.selected_category_from_dropdown_index = 0
 if 'confirmed_category' not in st.session_state:
     st.session_state.confirmed_category = None
+if 'show_all_categories' not in st.session_state: 
+    st.session_state.show_all_categories = False
 
 # --- global variables ---
 SELECT_TEXT = "-- Select a category --"
-#OPTIONS_FOR_DROPDOWN = [SELECT_TEXT, st.session_state.last_prediction, "--- Choose another category ---"] if st.session_state.last_prediction else [SELECT_TEXT]
+CHOOSE_OTHER_CATEGORY_TEXT = "-- Choose another category --"
 
 # --- Helper Functions for API Calls ---
+reponse = None
 
 def login_user(username, password):
     """
@@ -158,6 +189,23 @@ def get_model_info():
         st.error(f"Error details: {response.text}")
         return None
     
+def prepare_dropdown_options(product_dict, predicted_category):
+    """
+    Prepares a list of categories for the dropdown.
+
+    Args:
+        product_dict (dict): a dictionary mapping product codes to category names.
+        predicted_category (str): name of the category predicted by the model.
+
+    Returns:
+        list: a list of category names for the dropdown, starting with the predicted category.
+    """
+    options = [predicted_category]  
+    for category in sorted(list(product_dict.values())):
+        if category != predicted_category:  
+            options.append(category)
+    return options
+    
 # --- UI Callback Functions ---
 
 def handle_predict_button_click():
@@ -169,6 +217,7 @@ def handle_predict_button_click():
     st.session_state.selected_category_from_dropdown_index = 0
     st.session_state.confirmed_category = None # Clear any previous confirmation
     st.session_state.show_prediction_message = False # Reset message visibility
+    st.session_state.show_all_categories = False
 
     designation = st.session_state.designation_input
     description = st.session_state.description_input
@@ -177,7 +226,7 @@ def handle_predict_button_click():
         predicted_class = get_prediction(designation, description)
         if predicted_class:
             st.session_state.last_prediction = predicted_class
-            st.session_state.selected_category_from_dropdown_index = 1 # Set dropdown to predicted class
+            st.session_state.selected_category_from_dropdown_index = 0 # Set dropdown to predicted class
             st.session_state.show_prediction_message = True # Show prediction message
            
         else:
@@ -194,16 +243,9 @@ def handle_confirm_category_click(selected_category_value):
     # Get the currently selected value from the selectbox
     current_selection = selected_category_value
 
-    if current_selection != SELECT_TEXT:
+    if current_selection != SELECT_TEXT and current_selection != CHOOSE_OTHER_CATEGORY_TEXT:
         st.session_state.show_upload_message = True
         st.session_state.confirmed_category = current_selection
-
-        #st.write(f"Callback erreicht für Kategorie: {st.session_state.confirmed_category}")
-
-        #with st.status(label="Uploading article...", state="running", expanded=False) as status:
-        #    time.sleep(1)
-        #    status.update(label=f"Article uploaded in category **'{st.session_state.confirmed_category}'**", state='complete', expanded=False)
-        #    time.sleep(2)
 
         # a) Clear input fields and reset dropdown after confirmation
         st.session_state.designation_input = ""
@@ -211,6 +253,23 @@ def handle_confirm_category_click(selected_category_value):
         st.session_state.last_prediction = None # Clear prediction
         st.session_state.selected_category_from_dropdown_index = 0 # Reset dropdown
         st.session_state.show_prediction_message = False # Hide prediction message
+        st.session_state.show_all_categories = False # Reset category selection state
+
+def handle_category_select_change():
+    """
+    Callback for when the category selectbox changes.
+    Updates the index of the selected category in session state.
+    """
+    # Get the currently selected value from the selectbox
+    selected_value = st.session_state.category_select
+
+    if selected_value == CHOOSE_OTHER_CATEGORY_TEXT:
+        st.session_state.show_all_categories = True
+        st.session_state.selected_category_from_dropdown_index = 0
+    #elif selected_value == SELECT_TEXT:
+    #    pass
+    else:
+        pass
 
 
 # --- Streamlit UI Layout ---
@@ -292,33 +351,34 @@ else:
     if st.session_state.show_prediction_message and st.session_state.last_prediction:
         st.markdown("---")
 
-        OPTIONS_FOR_DROPDOWN = [SELECT_TEXT, st.session_state.last_prediction, "--- Choose another category ---"]
+        #options_for_dropdown = dropdown_options = prepare_dropdown_options(product_dict, st.session_state.last_prediction)
+        #options_for_dropdown.insert(0, SELECT_TEXT)
+        dynamic_dropdown_options = []
+
+        if not st.session_state.show_all_categories:
+            dynamic_dropdown_options = [st.session_state.last_prediction,
+                                        CHOOSE_OTHER_CATEGORY_TEXT]
+            if st.session_state.selected_category_from_dropdown_index == 0:
+                st.session_state.selected_category_from_dropdown_index = 0
+        else:
+            all_categories_sorted = prepare_dropdown_options(product_dict, st.session_state.last_prediction)
+            dynamic_dropdown_options = [SELECT_TEXT] + all_categories_sorted
 
         current_selection = st.selectbox(
             "Category selection",
-            options=OPTIONS_FOR_DROPDOWN,
+            options=dynamic_dropdown_options,
             index=st.session_state.selected_category_from_dropdown_index,
-            key="category_select"
+            key="category_select",
+            on_change=handle_category_select_change
         )
 
-        if current_selection != SELECT_TEXT:
+        if current_selection != SELECT_TEXT and current_selection != CHOOSE_OTHER_CATEGORY_TEXT:
             st.button("Upload article", 
                     key="confirm_category_button", 
                     on_click=handle_confirm_category_click,
                     args=(current_selection,))
         
-        #message_placeholder = st.empty()
-
-        #if st.session_state.get('show_upload_message'):
-        #    if time.time() < st.session_state.upload_message_end_time:
-        #        if st.session_state.get('confirmed_category'):
-        #            message_placeholder.success(f"Article uploaded in category **'{st.session_state.confirmed_category}'**")
-
-        #    else:
-        #        message_placeholder.empty()
-        #        st.session_state.show_upload_message = False
-        #        st.session_state.upload_message_end_time = 0
-        #        st.rerun()
+    
     message_placeholder = st.empty()
     if 'show_upload_message' in st.session_state and st.session_state.show_upload_message:    
         if st.session_state.get('confirmed_category'):
