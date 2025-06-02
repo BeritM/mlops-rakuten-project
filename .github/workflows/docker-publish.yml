@@ -1,11 +1,12 @@
-name: Build & Push Docker Services
+name: Pytest, Build & Push Docker Services
 
-# Verhindere parallele Runs auf demselben Branch
+# Avoids concurrency issues by grouping jobs under the same workflow and branch
+# This ensures that only the latest workflow run for a branch is executed.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Trigger: push oder PR zu main, develop, dev_new-feature-githubactions
+# Trigger: push or PR to main, develop, dev_new-feature-githubactions
 on:
   push:
     branches: [ main, develop, dev_new-feature-githubactions ]
@@ -13,16 +14,16 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  # Docker Hub namespace/repo prefix
+  # Docker Hub namespace
   REGISTRY: docker.io
   IMAGE_PREFIX: igurstein/rakuten_dev
 
 jobs:
   # ============================================================================
-  # 1) Run pytest tests (code-level) mit DVC Pull (S3-Support)
+  # 1) Run pytest tests (on code-level) with DVC Pull (S3-Support)
   # ============================================================================
   pytest-tests:
-    name: Run pytest tests
+    name: Run pytest tests (on code-level) with DVC Pull (S3-Support)
     runs-on: ubuntu-latest
 
     steps:
@@ -34,7 +35,7 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install Python dependencies and DVC (inkl. S3-Support)
+      - name: Install Python dependencies and DVC (S3-Support)
         run: |
           python -m pip install --upgrade pip
           pip install "dvc[s3]"
@@ -52,10 +53,10 @@ jobs:
           pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q
 
   # ============================================================================
-  # 2) Build & Push dvc-sync Image (disable DVC pushes via sed)
+  # 2) Build dvc-sync Image (disable DVC pushes via sed)
   # ============================================================================
   dvc-sync:
-    name: Build & Push dvc-sync
+    name: Build dvc-sync Image (disable DVC pushes via sed)
     runs-on: ubuntu-latest
     #needs: pytest-tests
 
@@ -97,10 +98,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 3) Build & Push preprocessing Image (disable DVC/MLflow pushes)
+  # 3) Build preprocessing Image (disable DVC/MLflow pushes)
   # ============================================================================
   preprocessing:
-    name: Build & Push preprocessing
+    name: Build preprocessing Image (disable DVC/MLflow pushes)
     runs-on: ubuntu-latest
     needs: dvc-sync
 
@@ -143,10 +144,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 4) Build & Push model_training Image (disable DVC/MLflow pushes)
+  # 4) Build model_training Image (disable DVC/MLflow pushes)
   # ============================================================================
   model_training:
-    name: Build & Push model_training
+    name: Build model_training Image (disable DVC/MLflow pushes)
     runs-on: ubuntu-latest
     needs: preprocessing
 
@@ -189,10 +190,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 5) Build & Push model_validation Image (disable DVC/MLflow pushes)
+  # 5) Build model_validation Image (disable DVC/MLflow pushes)
   # ============================================================================
   model_validation:
-    name: Build & Push model_validation
+    name: Build model_validation Image (disable DVC/MLflow pushes)
     runs-on: ubuntu-latest
     needs: model_training
 
@@ -238,7 +239,7 @@ jobs:
   # 6) Final Job: Build all Docker Compose services (no run, no DVC/MLflow)
   # ============================================================================
   tests:
-    name: Build Docker Compose Services for Testing
+    name: Build all Docker Compose services (no run, no DVC/MLflow)
     runs-on: ubuntu-latest
     needs: model_validation
 
@@ -248,7 +249,7 @@ jobs:
 
       - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow and shared_volume copy
         run: |
-          # Kommentiere alle dvc pull/push & pytest aus
+          # Comment out DVC/MLflow pushes in all Dockerfiles used by docker-compose
           sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
@@ -268,5 +269,5 @@ jobs:
 
       - name: Build all Docker Compose services (SKIP actual run)
         run: |
-          # Nutze Docker Compose V2 (ohne Bindestrich)
+          # Use Docker Compose V2 syntax without running the containers
           docker compose build
