@@ -37,9 +37,11 @@ services:
     ports:
       - "8002:8002"
     volumes:
-      #- "./shared_volume/data:/app/data" Not necessary for prediction
-      - "./shared_volume/models:/app/models"
-      - dvc-cache:/workspace/.dvc/cache
+      # - "./shared_volume/data:/app/data"
+      # - "./shared_volume/models:/app/models"
+      # - dvc-cache:/workspace/.dvc/cache
+      - ./shared_volume/data:/app/data
+      - ./shared_volume/models:/app/models
     depends_on:
       auth_service:
         condition: service_healthy

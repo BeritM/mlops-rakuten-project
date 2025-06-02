@@ -10,7 +10,7 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # copy requirements.txt
-COPY dockerfiles/inference/requirements.txt .
+COPY dockerfiles/predict_service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
@@ -24,3 +24,7 @@ EXPOSE 8002
 
 # Run the FastAPI app
 CMD ["uvicorn", "plugins.cd4ml.inference.predict_service:predict_app", "--host", "0.0.0.0", "--port", "8002"]
+
+# Health-Check for Predict Service
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+  CMD curl --silent --fail http://localhost:8002/health || exit 1
