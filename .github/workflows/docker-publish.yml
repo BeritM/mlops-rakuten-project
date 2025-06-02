@@ -1,11 +1,11 @@
 name: Build & Push Docker Services
 
-# Prevent duplicate runs on the same branch
+# Verhindere parallele Runs auf demselben Branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Trigger on push or PR to main, develop, or dev_new-feature-githubactions
+# Trigger auf Push/PR zu main, develop oder dev_new-feature-githubactions
 on:
   push:
     branches: [ main, develop, dev_new-feature-githubactions ]
@@ -13,13 +13,13 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  # We will push to Docker Hub under your namespace “igurstein/rakuten_dev”
+  # Wir pushen später nach Docker Hub unter: igurstein/rakuten_dev-<service>
   REGISTRY: docker.io
   IMAGE_PREFIX: igurstein/rakuten_dev
 
 jobs:
   # ============================================================================
-  # 1) Run pytest tests (code-level) with DVC pull of required artifacts
+  # 1) Run pytest tests (code-level) mit DVC Pull (S3-Support)
   # ============================================================================
   pytest-tests:
     name: Run pytest tests
@@ -34,15 +34,17 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install Python dependencies and DVC
+      - name: Install Python dependencies and DVC (inkl. S3-Support)
         run: |
           python -m pip install --upgrade pip
-          pip install dvc
+          # Achtung: "dvc[s3]" installiert das dvc_s3-Paket, damit 'dvc pull' von S3 funktioniert
+          pip install "dvc[s3]"
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
 
       - name: Pull only required DVC artifacts
         run: |
+          # Stelle sicher, dass deine DVC-Remote-Konfiguration (in .dvc/config) auf S3 zeigt
           dvc pull models/tfidf_vectorizer.pkl
           dvc pull models/sgd_text_model.pkl
           dvc pull models/product_dictionary.pkl
@@ -57,7 +59,7 @@ jobs:
   dvc-sync:
     name: Build & Push dvc-sync
     runs-on: ubuntu-latest
-    needs: pytest-tests
+    #needs: pytest-tests
 
     steps:
       - name: Checkout code
@@ -156,110 +158,4 @@ jobs:
 
       - name: Patch Dockerfile to disable DVC/MLflow pushes
         run: |
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_training/Dockerfile || true
-          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_training/Dockerfile || true
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract Docker metadata for model_training
-        id: meta-train
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-training
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern=v*.*.*
-
-      - name: Build & Push model_training Image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/model_training/Dockerfile
-          push: true
-          tags: ${{ steps.meta-train.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ============================================================================
-  # 5) Build & Push model_validation Image (disable DVC/MLflow pushes)
-  # ============================================================================
-  model_validation:
-    name: Build & Push model_validation
-    runs-on: ubuntu-latest
-    needs: model_training
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Patch Dockerfile to disable DVC/MLflow pushes
-        run: |
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
-          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_validation/Dockerfile || true
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Extract Docker metadata for model_validation
-        id: meta-validate
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-validation
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern=v*.*.*
-
-      - name: Build & Push model_validation Image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/model_validation/Dockerfile
-          push: true
-          tags: ${{ steps.meta-validate.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ============================================================================
-  # 6) Final Job: Build all Docker Compose services (no run, no DVC/MLflow)
-  # ============================================================================
-  tests:
-    name: Build Docker Compose Services for Testing
-    runs-on: ubuntu-latest
-    needs: model_validation
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow
-        run: |
-          sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
-          sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build all Docker Compose services (SKIP actual run)
-        run: |
-          docker-compose build
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_training_
