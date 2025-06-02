@@ -1,4 +1,6 @@
-name: Pytest, Build & Push Docker Services
+name: Pytest, Build & Push singe Docker Services, and Docker Compose Build
+# This workflow runs pytest tests, builds and pushes Docker images for various services, and checks Docker Compose build without running containers.
+# It is triggered on pushes or pull requests to the main, develop, or dev_new-feature-githubactions branches.
 
 # Avoids concurrency issues by grouping jobs under the same workflow and branch
 concurrency:
@@ -13,7 +15,7 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  # Docker Hub namespace (one single repo for all images)
+  # Docker Hub namespace
   REGISTRY: docker.io
   IMAGE_PREFIX: igurstein/rakuten_dev
 
@@ -363,7 +365,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 9) Final Job: Build all Docker Compose services from docker-compose.yml together 
+  # 9) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
   #    (no push, no run, no DVC/MLflow, just checking docker-compose build)
   # ============================================================================
   tests:
@@ -372,7 +374,7 @@ jobs:
     needs:
       - predict-service
       - model_validation
-    # - tests-service
+     #- tests-service
 
     steps:
       - name: Checkout code
@@ -380,13 +382,11 @@ jobs:
 
       - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow and shared_volume copy
         run: |
-          # Comment out any DVC/MLflow pulls/pushes & pytest in the test Dockerfile
           sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
 
-          # Disable copying shared_volume if missing
           sed -i 's/^RUN cp -R shared_volume\/data/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN cp -R shared_volume\/models/# &/g' dockerfiles/tests/Dockerfile || true
 
@@ -399,5 +399,8 @@ jobs:
 
       - name: Build all Docker Compose services (SKIP actual run)
         run: |
-          # Use Docker Compose V2 syntax without running containers
           docker compose build
+
+      - name: Build inference‐only Docker Compose services (SKIP actual run)
+        run: |
+          docker compose -f docker-compose.inference.yml build
