@@ -9,4 +9,3 @@ dagshub==0.1.0
 dvc[s3]
 joblib
 mlflow
-pyarrow>=17.0.0
