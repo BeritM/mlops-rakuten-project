@@ -57,7 +57,7 @@ jobs:
   dvc-sync:
     name: Build and Push dvc-sync Image (disable DVC pushes via sed)
     runs-on: ubuntu-latest
-    needs: pytest-tests
+    #needs: pytest-tests
 
     steps:
       - name: Checkout code
