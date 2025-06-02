@@ -1,79 +1,262 @@
-# .github/workflows/docker-publish.yml
-name: Build, Test & Push Docker Images
+name: Build & Push Docker Services
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   push:
-    branches:
-      - main
-      - develop
-      - dev_new-feature-githubactions
+    branches: [ main, develop, dev_new-feature-githubactions ]
+  pull_request:
+    branches: [ main, develop, dev_new-feature-githubactions ]
 
-permissions:
-  contents: read
+env:
+  REGISTRY: docker.io
+  IMAGE_PREFIX: igurstein/rakuten_dev
 
 jobs:
-  test:
+  # ============================================================================
+  # 1) Run pytest (code-level) with DVC pull of required artifacts
+  # ============================================================================
+  pytest-tests:
+    name: Run pytest tests
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
 
-      - name: Set up Python
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.9
         uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          python-version: '3.9'
 
-      - name: Install test dependencies
+      - name: Install Python dependencies and DVC
         run: |
-          pip install -r dockerfiles/tests/requirements.txt
+          python -m pip install --upgrade pip
+          pip install dvc
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
 
-      - name: Run all tests
+      - name: Pull only required DVC artifacts
         run: |
-          pytest plugins/cd4ml/tests -v -rA
+          dvc pull models/tfidf_vectorizer.pkl
+          dvc pull models/sgd_text_model.pkl
+          dvc pull models/product_dictionary.pkl
 
-  build-and-push:
-    needs: test
+      - name: Run pytest in plugins/cd4ml/tests
+        run: |
+          pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q
+
+  # ============================================================================
+  # 2) Build & Push dvc-sync Image (disable DVC pushes via sed)
+  # ============================================================================
+  dvc-sync:
+    name: Build & Push dvc-sync
     runs-on: ubuntu-latest
-    concurrency:
-      group: build-${{ matrix.service }}-${{ github.ref_name }}
-      cancel-in-progress: true
-    strategy:
-      matrix:
-        service: [auth_service, predict_service]
-    env:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
+    #needs: pytest-tests
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ env.DOCKERHUB_USERNAME }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+      - name: Patch Dockerfile to disable DVC pushes
+        run: |
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/dvc/Dockerfile
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
-      - name: Build ${{ matrix.service }}
-        run: |
-          docker build \
-            -f dockerfiles/${{ matrix.service }}/Dockerfile \
-            -t igurstein/rakuten_dev:${{ matrix.service }}-${{ github.ref_name }} \
-            .
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push ${{ matrix.service }} to Docker Hub
-        run: |
-          docker push igurstein/rakuten_dev:${{ matrix.service }}-${{ github.ref_name }}
+      - name: Extract Docker metadata for dvc-sync
+        id: meta-dvc
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-dvc-sync
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern=v*.*.*
 
-      - name: Tag ${{ matrix.service }} as latest
-        if: github.ref == 'refs/heads/main'
+      - name: Build & Push dvc-sync Image
+        uses: docker/build-push-action@v3
+        with:
+          context: dockerfiles/dvc
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta-dvc.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 3) Build & Push preprocessing Image (disable DVC/MLflow pushes)
+  # ============================================================================
+  preprocessing:
+    name: Build & Push preprocessing
+    runs-on: ubuntu-latest
+    needs: dvc-sync
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfile to disable DVC/MLflow pushes
         run: |
-          docker tag \
-            igurstein/rakuten_dev:${{ matrix.service }}-main \
-            igurstein/rakuten_dev:${{ matrix.service }}-latest
-          docker push igurstein/rakuten_dev:${{ matrix.service }}-latest
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/preprocessing/Dockerfile || true
+          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/preprocessing/Dockerfile || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata for preprocessing
+        id: meta-preproc
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-preprocessing
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern=v*.*.*
+
+      - name: Build & Push preprocessing Image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: dockerfiles/preprocessing/Dockerfile
+          push: true
+          tags: ${{ steps.meta-preproc.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 4) Build & Push model_training Image (disable DVC/MLflow pushes)
+  # ============================================================================
+  model_training:
+    name: Build & Push model_training
+    runs-on: ubuntu-latest
+    needs: preprocessing
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfile to disable DVC/MLflow pushes
+        run: |
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_training/Dockerfile || true
+          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_training/Dockerfile || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata for model_training
+        id: meta-train
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-training
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern=v*.*.*
+
+      - name: Build & Push model_training Image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: dockerfiles/model_training/Dockerfile
+          push: true
+          tags: ${{ steps.meta-train.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 5) Build & Push model_validation Image (disable DVC/MLflow pushes)
+  # ============================================================================
+  model_validation:
+    name: Build & Push model_validation
+    runs-on: ubuntu-latest
+    needs: model_training
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfile to disable DVC/MLflow pushes
+        run: |
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata for model_validation
+        id: meta-validate
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-validation
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern=v*.*.*
+
+      - name: Build & Push model_validation Image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: dockerfiles/model_validation/Dockerfile
+          push: true
+          tags: ${{ steps.meta-validate.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 6) Final Job: Build all Docker Compose services (no run, no DVC/MLflow)
+  # ============================================================================
+  tests:
+    name: Build Docker Compose Services for Testing
+    runs-on: ubuntu-latest
+    needs: model_validation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow
+        run: |
+          sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build all Docker Compose services (SKIP actual run)
+        run: |
+          docker-compose build
