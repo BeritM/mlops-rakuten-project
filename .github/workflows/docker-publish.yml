@@ -25,7 +25,7 @@ jobs:
   # ============================================================================  
   # 1) Lint Python-Code mit Pylint
   # ============================================================================
-  lint:
+  pylint:
     name: Lint Python Code mit Pylint
     runs-on: ubuntu-latest
 
