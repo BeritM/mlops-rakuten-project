@@ -1,7 +1,6 @@
 name: Pytest, Build & Push Docker Services
 
 # Avoids concurrency issues by grouping jobs under the same workflow and branch
-# This ensures that only the latest workflow run for a branch is executed.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -14,7 +13,7 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
-  # Docker Hub namespace
+  # Docker Hub namespace (one single repo for all images)
   REGISTRY: docker.io
   IMAGE_PREFIX: igurstein/rakuten_dev
 
@@ -53,12 +52,12 @@ jobs:
           pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q
 
   # ============================================================================
-  # 2) Build dvc-sync Image (disable DVC pushes via sed)
+  # 2) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
   # ============================================================================
   dvc-sync:
-    name: Build dvc-sync Image (disable DVC pushes via sed)
+    name: Build and Push dvc-sync Image (disable DVC pushes via sed)
     runs-on: ubuntu-latest
-    #needs: pytest-tests
+    needs: pytest-tests
 
     steps:
       - name: Checkout code
@@ -74,7 +73,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: docker.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -82,9 +81,12 @@ jobs:
         id: meta-dvc
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-dvc-sync
+          # All images share the same repo: igurstein/rakuten_dev
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            type=ref,event=branch
+            # Literal tag "dvc-sync-<branch>"
+            dvc-sync-${{ github.ref_name }}
+            # Also preserve semver tags (e.g. v1.2.3) if present
             type=semver,pattern=v*.*.*
 
       - name: Build & Push dvc-sync Image
@@ -93,15 +95,18 @@ jobs:
           context: .
           file: dockerfiles/dvc/Dockerfile
           push: true
+          # This will push under igurstein/rakuten_dev with tag(s):
+          #   dvc-sync-<branch>  (e.g. dvc-sync-main)
+          #   vX.Y.Z            (if a semver tag triggered the run)
           tags: ${{ steps.meta-dvc.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 3) Build preprocessing Image (disable DVC/MLflow pushes)
+  # 3) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
   preprocessing:
-    name: Build preprocessing Image (disable DVC/MLflow pushes)
+    name: Build and Push preprocessing Image (disable DVC/MLflow pushes)
     runs-on: ubuntu-latest
     needs: dvc-sync
 
@@ -120,7 +125,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: docker.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -128,9 +133,9 @@ jobs:
         id: meta-preproc
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-preprocessing
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            type=ref,event=branch
+            preprocessing-${{ github.ref_name }}
             type=semver,pattern=v*.*.*
 
       - name: Build & Push preprocessing Image
@@ -144,10 +149,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 4) Build model_training Image (disable DVC/MLflow pushes)
+  # 4) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
   model_training:
-    name: Build model_training Image (disable DVC/MLflow pushes)
+    name: Build and Push model_training Image (disable DVC/MLflow pushes)
     runs-on: ubuntu-latest
     needs: preprocessing
 
@@ -166,7 +171,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: docker.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -174,9 +179,9 @@ jobs:
         id: meta-train
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-training
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            type=ref,event=branch
+            model-training-${{ github.ref_name }}
             type=semver,pattern=v*.*.*
 
       - name: Build & Push model_training Image
@@ -190,10 +195,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 5) Build model_validation Image (disable DVC/MLflow pushes)
+  # 5) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
   model_validation:
-    name: Build model_validation Image (disable DVC/MLflow pushes)
+    name: Build and Push model_validation Image (disable DVC/MLflow pushes)
     runs-on: ubuntu-latest
     needs: model_training
 
@@ -212,7 +217,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: docker.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
@@ -220,9 +225,9 @@ jobs:
         id: meta-validate
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-model-validation
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            type=ref,event=branch
+            model-validation-${{ github.ref_name }}
             type=semver,pattern=v*.*.*
 
       - name: Build & Push model_validation Image
@@ -249,21 +254,20 @@ jobs:
 
       - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow and shared_volume copy
         run: |
-          # Comment out DVC/MLflow pushes in all Dockerfiles used by docker-compose
+          # Comment out DVC/MLflow pulls/pushes & pytest in the test Dockerfile
           sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
 
-          # **NEU**: Kommentiere "cp -R shared_volume/…" aus im Test-Dockerfile,
-          # damit das Fehlen von shared_volume/models nicht zum Fehler führt:
+          # Disable copying shared_volume folders if they do not exist
           sed -i 's/^RUN cp -R shared_volume\/data/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN cp -R shared_volume\/models/# &/g' dockerfiles/tests/Dockerfile || true
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: docker.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
