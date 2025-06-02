@@ -1,62 +1,30 @@
-name: Validate & Build Docker Compose Files
-
-# Verhindert gleichzeitige Runs für denselben Branch
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-on:
-  push:
-    branches:
-      - main
-      - develop
-      - dev_new-feature-githubactions
-  pull_request:
-    branches:
-      - main
-      - develop
-      - dev_new-feature-githubactions
-
-env:
-  # Hält DockerHub-Infos
-  REGISTRY: docker.io
-  IMAGE_PREFIX: igurstein/rakuten_dev
-
 jobs:
-  # ==========================================================================
-  # A) Syntax-Validierung und "Schnell-Build" (No-Cache) beider Compose-Dateien
-  # ==========================================================================
   compose-check:
-    name: Lint & Quick-Build Docker Compose Files
+    name: Lint & Build Docker Compose Files
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Create empty .env
+        run: touch .env
+
       - name: Check Docker Compose version
         run: docker compose version
 
-      # docker-compose.yml → Syntax
-      - name: Validate syntax docker-compose.yml
+      - name: Validate syntax in docker-compose.yml
         run: docker compose -f docker-compose.yml config
 
-      # docker-compose.yml → No-Cache-Build (schnell testen)
       - name: Quick-Build docker-compose.yml (no-cache)
         run: docker compose -f docker-compose.yml build --no-cache
 
-      # docker-compose.inference.yml → Syntax
-      - name: Validate syntax docker-compose.inference.yml
+      - name: Validate syntax in docker-compose.inference.yml
         run: docker compose -f docker-compose.inference.yml config
 
-      # docker-compose.inference.yml → No-Cache-Build
       - name: Quick-Build docker-compose.inference.yml (no-cache)
         run: docker compose -f docker-compose.inference.yml build --no-cache
 
-  # ==========================================================================
-  # B) Finaler Compose-Build (mit Patch) für beide Dateien
-  #    → baut jede Datei einmal, nachdem die Dockerfiles gepatcht wurden.
-  # ==========================================================================
   tests:
     name: Build Final Docker Compose Services (no run, no DVC/MLflow)
     runs-on: ubuntu-latest
@@ -64,35 +32,23 @@ jobs:
       - compose-check
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Patching: DVC/MLflow-Schritte und shared_volume-COPY in Dockerfiles auskommentieren
-      - name: Patch Dockerfiles for Compose-build
+      - name: Create empty .env
+        run: touch .env
+
+      - name: Patch Dockerfiles for Compose build
         run: |
-          # tests-Dockerfile: dvc pull / dvc push / pytest auskommentieren
           sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
-          # model_validation: dvc push auskommentieren
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
-          # tests-Dockerfile: shared_volume COPY auskommentieren, falls Verzeichnis fehlt
           sed -i 's/^RUN cp -R shared_volume\/data/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN cp -R shared_volume\/models/# &/g' dockerfiles/tests/Dockerfile || true
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build services from docker-compose.yml (SKIP actual run)
+        run: docker compose -f docker-compose.yml build
 
-      # docker-compose.yml → Finaler Build
-      - name: Build docker-compose.yml services (SKIP run)
-        run: |
-          docker compose -f docker-compose.yml build
-
-      # docker-compose.inference.yml → Finaler Build
-      - name: Build docker-compose.inference.yml services (SKIP run)
-        run: |
-          docker compose -f docker-compose.inference.yml build
+      - name: Build services from docker-compose.inference.yml (SKIP actual run)
+        run: docker compose -f docker-compose.inference.yml build
