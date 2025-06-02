@@ -83,7 +83,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            dvc-sync-${{ github.ref_name }}
+            dvc-sync
             type=semver,pattern=v*.*.*
 
       - name: Build & Push dvc-sync Image
@@ -129,7 +129,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            preprocessing-${{ github.ref_name }}
+            preprocessing
             type=semver,pattern=v*.*.*
 
       - name: Build & Push preprocessing Image
@@ -175,7 +175,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            model-training-${{ github.ref_name }}
+            model-training
             type=semver,pattern=v*.*.*
 
       - name: Build & Push model_training Image
@@ -221,7 +221,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            model-validation-${{ github.ref_name }}
+            model-validation
             type=semver,pattern=v*.*.*
 
       - name: Build & Push model_validation Image
@@ -262,7 +262,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            auth-service-${{ github.ref_name }}
+            auth-service
             type=semver,pattern=v*.*.*
 
       - name: Build & Push auth_service Image
@@ -305,7 +305,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            predict-service-${{ github.ref_name }}
+            predict-service
             type=semver,pattern=v*.*.*
 
       - name: Build & Push predict_service Image
@@ -319,7 +319,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 8) Final Job: Build all Docker Compose services (no run, no DVC/MLflow)
+  # 8) Final Job: Build all Docker Compose services from docker-compose.yml together (no push, no run, no DVC/MLflow, just checking docker-compose build)
   # ============================================================================
   tests:
     name: Build all Docker Compose services (no run, no DVC/MLflow)
