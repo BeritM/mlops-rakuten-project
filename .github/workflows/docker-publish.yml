@@ -235,12 +235,55 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 6) Build and push auth_service Image under single repo
+  # 6) Build and push tests Image under single repo
+  # ============================================================================
+  tests-service:
+    name: Build and Push tests Image
+    runs-on: ubuntu-latest
+    needs: model_validation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata for tests service
+        id: meta-tests
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
+          tags: |
+            tests
+            type=semver,pattern=v*.*.*
+
+      - name: Build & Push tests Image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: dockerfiles/tests/Dockerfile
+          push: true
+          tags: ${{ steps.meta-tests.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 7) Build and push auth_service Image under single repo
   # ============================================================================
   auth-service:
     name: Build and Push auth_service Image
     runs-on: ubuntu-latest
-    needs: model_validation
+    needs:
+      - model_validation
+    # - tests-service
 
     steps:
       - name: Checkout code
@@ -276,7 +319,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 7) Build and push predict_service Image under single repo
+  # 8) Build and push predict_service Image under single repo
   # ============================================================================
   predict-service:
     name: Build and Push predict_service Image
@@ -284,6 +327,7 @@ jobs:
     needs:
       - auth-service
       - model_validation
+    #  - tests-service
 
     steps:
       - name: Checkout code
@@ -319,7 +363,8 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 8) Final Job: Build all Docker Compose services from docker-compose.yml together (no push, no run, no DVC/MLflow, just checking docker-compose build)
+  # 9) Final Job: Build all Docker Compose services from docker-compose.yml together 
+  #    (no push, no run, no DVC/MLflow, just checking docker-compose build)
   # ============================================================================
   tests:
     name: Build all Docker Compose services (no run, no DVC/MLflow)
@@ -327,6 +372,7 @@ jobs:
     needs:
       - predict-service
       - model_validation
+    # - tests-service
 
     steps:
       - name: Checkout code
