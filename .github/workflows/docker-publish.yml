@@ -1,9 +1,11 @@
 name: Build & Push Docker Services
 
+# Prevent duplicate runs on the same branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Trigger on push or PR to main, develop, or dev_new-feature-githubactions
 on:
   push:
     branches: [ main, develop, dev_new-feature-githubactions ]
@@ -11,12 +13,13 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
+  # We will push to Docker Hub under your namespace “igurstein/rakuten_dev”
   REGISTRY: docker.io
   IMAGE_PREFIX: igurstein/rakuten_dev
 
 jobs:
   # ============================================================================
-  # 1) Run pytest (code-level) with DVC pull of required artifacts
+  # 1) Run pytest tests (code-level) with DVC pull of required artifacts
   # ============================================================================
   pytest-tests:
     name: Run pytest tests
@@ -54,7 +57,7 @@ jobs:
   dvc-sync:
     name: Build & Push dvc-sync
     runs-on: ubuntu-latest
-    #needs: pytest-tests
+    needs: pytest-tests
 
     steps:
       - name: Checkout code
@@ -86,8 +89,8 @@ jobs:
       - name: Build & Push dvc-sync Image
         uses: docker/build-push-action@v3
         with:
-          context: dockerfiles/dvc
-          file: Dockerfile
+          context: .
+          file: dockerfiles/dvc/Dockerfile
           push: true
           tags: ${{ steps.meta-dvc.outputs.tags }}
           cache-from: type=gha
