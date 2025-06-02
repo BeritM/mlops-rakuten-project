@@ -1,15 +1,13 @@
-name: Validate Docker Compose Files
+name: Validate & Build Docker Compose Files
 
-# Avoids concurrency issues by grouping jobs under the same workflow and branch
+# Verhindert gleichzeitige Runs für denselben Branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
-# This GitHub Actions workflow validates the syntax of Docker Compose files
-# and attempts to build all services defined in those files.
+
 on:
   push:
-    branches: 
+    branches:
       - main
       - develop
       - dev_new-feature-githubactions
@@ -20,77 +18,68 @@ on:
       - dev_new-feature-githubactions
 
 env:
-  # Docker Hub namespace, needed in the "tests" job
+  # Hält DockerHub-Infos
   REGISTRY: docker.io
   IMAGE_PREFIX: igurstein/rakuten_dev
 
 jobs:
-  # ============================================================================
-  # 1) Lint & Build Docker Compose Services
-  # ============================================================================
+  # ==========================================================================
+  # A) Syntax-Validierung und "Schnell-Build" (No-Cache) beider Compose-Dateien
+  # ==========================================================================
   compose-check:
-    name: Lint & Build Docker Compose Services
+    name: Lint & Quick-Build Docker Compose Files
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout the repository to access the Docker Compose files
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2) Check if Docker Compose is installed and available
       - name: Check Docker Compose version
         run: docker compose version
 
-      # 3) Check syntax of docker-compose.yml
-      - name: Validate syntax in docker-compose.yml
+      # docker-compose.yml → Syntax
+      - name: Validate syntax docker-compose.yml
         run: docker compose -f docker-compose.yml config
 
-      # 4) Check if all services in docker-compose.yml can be built (without cache)
-      - name: Build all services from docker-compose.yml
+      # docker-compose.yml → No-Cache-Build (schnell testen)
+      - name: Quick-Build docker-compose.yml (no-cache)
         run: docker compose -f docker-compose.yml build --no-cache
 
-      # 5) Check syntax of docker-compose.inference.yml
-      - name: Validate syntax in docker-compose.inference.yml
+      # docker-compose.inference.yml → Syntax
+      - name: Validate syntax docker-compose.inference.yml
         run: docker compose -f docker-compose.inference.yml config
 
-      # 6) Check if all services in docker-compose.inference.yml can be built (without cache)
-      - name: Build all services from docker-compose.inference.yml
+      # docker-compose.inference.yml → No-Cache-Build
+      - name: Quick-Build docker-compose.inference.yml (no-cache)
         run: docker compose -f docker-compose.inference.yml build --no-cache
 
-  # ============================================================================
-  # 9) Final Job: Build all Docker Compose services from docker-compose.yml and
-  #    docker-compose.inference.yml together (no push, no run, no DVC/MLflow)
-  #    (includes patching Dockerfiles to disable DVC/MLflow and shared_volume copy)
-  # ============================================================================
+  # ==========================================================================
+  # B) Finaler Compose-Build (mit Patch) für beide Dateien
+  #    → baut jede Datei einmal, nachdem die Dockerfiles gepatcht wurden.
+  # ==========================================================================
   tests:
-    name: Build all Docker Compose services (no run, no DVC/MLflow)
+    name: Build Final Docker Compose Services (no run, no DVC/MLflow)
     runs-on: ubuntu-latest
     needs:
-      # These are not required to run first — you commented them out intentionally.
-      # - predict-service
-      # - model_validation
-      # - tests-service
+      - compose-check
 
     steps:
-      # 1) Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2) Patch Dockerfiles used by docker-compose to disable DVC/MLflow and shared_volume copy
-      - name: Patch Dockerfiles for Compose build
+      # Patching: DVC/MLflow-Schritte und shared_volume-COPY in Dockerfiles auskommentieren
+      - name: Patch Dockerfiles for Compose-build
         run: |
-          # Comment out any "dvc pull" lines in the tests Dockerfile
+          # tests-Dockerfile: dvc pull / dvc push / pytest auskommentieren
           sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
-          # Comment out any "dvc push" lines in both tests and model_validation Dockerfiles
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
-          # Comment out any "pytest" lines in the tests Dockerfile
           sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
-          # Disable copying shared_volume paths if missing in tests Dockerfile
+          # model_validation: dvc push auskommentieren
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+          # tests-Dockerfile: shared_volume COPY auskommentieren, falls Verzeichnis fehlt
           sed -i 's/^RUN cp -R shared_volume\/data/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN cp -R shared_volume\/models/# &/g' dockerfiles/tests/Dockerfile || true
 
-      # 3) Log in to Docker Hub (needed if the Compose file references pulled images)
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -98,12 +87,12 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 4) Build all services in docker-compose.yml (skip actual "up", just build)
-      - name: Build all Docker Compose services (SKIP actual run)
+      # docker-compose.yml → Finaler Build
+      - name: Build docker-compose.yml services (SKIP run)
         run: |
-          docker compose build
+          docker compose -f docker-compose.yml build
 
-      # 5) Build all services in docker-compose.inference.yml (skip actual "up")
-      - name: Build inference‐only Docker Compose services (SKIP actual run)
+      # docker-compose.inference.yml → Finaler Build
+      - name: Build docker-compose.inference.yml services (SKIP run)
         run: |
           docker compose -f docker-compose.inference.yml build
