@@ -22,28 +22,76 @@ env:
   IMAGE_PREFIX: igurstein/rakuten_dev
 
 jobs:
+  # ============================================================================  
+  # 1) Lint Python-Code mit Pylint
   # ============================================================================
-  # 1) Lint the Python code with Pylint
-  # ============================================================================
-  pylint:
-    name: Lint Python code with Pylint
+  lint:
+    name: Lint Python Code mit Pylint
     runs-on: ubuntu-latest
+
     strategy:
       matrix:
-        python-version: ["3.9"]
+        python-version: ["3.8", "3.9", "3.10"]
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies for linting
+      - name: Install Pylint
         run: |
-          python -m pip
+          python -m pip install --upgrade pip
+          pip install pylint
+
+      - name: Führe Pylint auf allen *.py-Dateien aus
+        run: |
+          pylint $(git ls-files '*.py')
+  
+  # ============================================================================  
+  # 2) CodeQL Security & Quality Analyse (nach Pylint)
+  # ============================================================================
+  codeql-analyze:
+    name: CodeQL Advanced Analyse
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    needs: lint     # wartet auf erfolgreichen Abschluss von „lint“
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # Für manuelle Builds (nur nötig, wenn „build-mode: manual“ gesetzt ist)
+      - if: matrix.build-mode == 'manual'
+        shell: bash
+        run: |
+          echo 'Du hast build-mode="manual" gewählt – hier die Kommandos zum Bauen einfügen'
+          exit 1
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
 
   # ============================================================================
   # 1) Run pytest tests (on code-level) with DVC Pull (S3-Support)
@@ -81,7 +129,9 @@ jobs:
   dvc-sync:
     name: Build and Push dvc-sync Image (disable DVC pushes via sed)
     runs-on: ubuntu-latest
-    needs: pylint
+    needs: 
+    - pylint
+    - codeql-analyze
 
     steps:
       - name: Checkout code
@@ -443,7 +493,9 @@ jobs:
   tests:
     name: Build all Docker Compose services (no run, no DVC/MLflow)
     runs-on: ubuntu-latest
-    needs: pylint
+    needs: 
+    - pylint
+    - codeql-analyze
 
     steps:
       - name: Checkout code
