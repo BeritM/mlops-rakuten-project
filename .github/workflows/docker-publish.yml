@@ -1,5 +1,6 @@
-name: Pytest, Build & Push singe Docker Services, and Docker Compose Build
-# This workflow runs pytest tests, builds and pushes Docker images for various services, and checks Docker Compose build without running containers.
+name: Pytest, Build & Push Single Docker Services, and Docker Compose Build
+# This workflow runs pytest tests, builds and pushes Docker images for various services,
+# and checks Docker Compose build without running containers.
 # It is triggered on pushes or pull requests to the main, develop, or dev_new-feature-githubactions branches.
 
 # Avoids concurrency issues by grouping jobs under the same workflow and branch
@@ -79,24 +80,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract Docker metadata for dvc-sync
-        id: meta-dvc
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
-          tags: |
-            dvc-sync
-            type=semver,pattern=v*.*.*
+      - name: Pull remote dvc-sync image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync || true
 
-      - name: Build & Push dvc-sync Image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/dvc/Dockerfile
-          push: true
-          tags: ${{ steps.meta-dvc.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build local dvc-sync image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync \
+            -f dockerfiles/dvc/Dockerfile \
+            .
+
+      - name: Compare and push dvc-sync image only if changed
+        run: |
+          REMOTE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync 2>/dev/null || echo "")
+          LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync)
+          if [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync
+          else
+            echo "dvc-sync image unchanged, skipping push"
+          fi
 
   # ============================================================================
   # 3) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
@@ -125,24 +129,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract Docker metadata for preprocessing
-        id: meta-preproc
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
-          tags: |
-            preprocessing
-            type=semver,pattern=v*.*.*
+      - name: Pull remote preprocessing image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing || true
 
-      - name: Build & Push preprocessing Image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/preprocessing/Dockerfile
-          push: true
-          tags: ${{ steps.meta-preproc.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build local preprocessing image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing \
+            -f dockerfiles/preprocessing/Dockerfile \
+            .
+
+      - name: Compare and push preprocessing image only if changed
+        run: |
+          REMOTE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing 2>/dev/null || echo "")
+          LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing)
+          if [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing
+          else
+            echo "preprocessing image unchanged, skipping push"
+          fi
 
   # ============================================================================
   # 4) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
@@ -171,24 +178,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract Docker metadata for model_training
-        id: meta-train
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
-          tags: |
-            model-training
-            type=semver,pattern=v*.*.*
+      - name: Pull remote model-training image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training || true
 
-      - name: Build & Push model_training Image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/model_training/Dockerfile
-          push: true
-          tags: ${{ steps.meta-train.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build local model-training image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training \
+            -f dockerfiles/model_training/Dockerfile \
+            .
+
+      - name: Compare and push model-training image only if changed
+        run: |
+          REMOTE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training 2>/dev/null || echo "")
+          LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training)
+          if [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training
+          else
+            echo "model-training image unchanged, skipping push"
+          fi
 
   # ============================================================================
   # 5) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
@@ -217,24 +227,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract Docker metadata for model_validation
-        id: meta-validate
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
-          tags: |
-            model-validation
-            type=semver,pattern=v*.*.*
+      - name: Pull remote model-validation image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation || true
 
-      - name: Build & Push model_validation Image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/model_validation/Dockerfile
-          push: true
-          tags: ${{ steps.meta-validate.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build local model-validation image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation \
+            -f dockerfiles/model_validation/Dockerfile \
+            .
+
+      - name: Compare and push model-validation image only if changed
+        run: |
+          REMOTE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation 2>/dev/null || echo "")
+          LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation)
+          if [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation
+          else
+            echo "model-validation image unchanged, skipping push"
+          fi
 
   # ============================================================================
   # 6) Build and push tests Image under single repo
@@ -258,24 +271,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract Docker metadata for tests service
-        id: meta-tests
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
-          tags: |
-            tests
-            type=semver,pattern=v*.*.*
+      - name: Pull remote tests image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests || true
 
-      - name: Build & Push tests Image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/tests/Dockerfile
-          push: true
-          tags: ${{ steps.meta-tests.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build local tests image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests \
+            -f dockerfiles/tests/Dockerfile \
+            .
+
+      - name: Compare and push tests image only if changed
+        run: |
+          REMOTE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests 2>/dev/null || echo "")
+          LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests)
+          if [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests
+          else
+            echo "tests image unchanged, skipping push"
+          fi
 
   # ============================================================================
   # 7) Build and push auth_service Image under single repo
@@ -301,24 +317,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract Docker metadata for auth_service
-        id: meta-auth
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
-          tags: |
-            auth-service
-            type=semver,pattern=v*.*.*
+      - name: Pull remote auth-service image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service || true
 
-      - name: Build & Push auth_service Image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/auth_service/Dockerfile
-          push: true
-          tags: ${{ steps.meta-auth.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build local auth-service image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service \
+            -f dockerfiles/auth_service/Dockerfile \
+            .
+
+      - name: Compare and push auth-service image only if changed
+        run: |
+          REMOTE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service 2>/dev/null || echo "")
+          LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service)
+          if [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service
+          else
+            echo "auth-service image unchanged, skipping push"
+          fi
 
   # ============================================================================
   # 8) Build and push predict_service Image under single repo
@@ -345,24 +364,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract Docker metadata for predict_service
-        id: meta-predict
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
-          tags: |
-            predict-service
-            type=semver,pattern=v*.*.*
+      - name: Pull remote predict-service image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service || true
 
-      - name: Build & Push predict_service Image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: dockerfiles/predict_service/Dockerfile
-          push: true
-          tags: ${{ steps.meta-predict.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build local predict-service image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service \
+            -f dockerfiles/predict_service/Dockerfile \
+            .
+
+      - name: Compare and push predict-service image only if changed
+        run: |
+          REMOTE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service 2>/dev/null || echo "")
+          LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service)
+          if [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service
+          else
+            echo "predict-service image unchanged, skipping push"
+          fi
 
   # ============================================================================
   # 9) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
@@ -374,7 +396,7 @@ jobs:
     needs:
       - predict-service
       - model_validation
-     #- tests-service
+      # - tests-service
 
     steps:
       - name: Checkout code
