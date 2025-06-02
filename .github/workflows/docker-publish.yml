@@ -57,7 +57,7 @@ jobs:
   codeql-analyze:
     name: CodeQL Advanced Analyse
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
-    needs: lint     # wartet auf erfolgreichen Abschluss von „lint“
+    needs: pylint     
     permissions:
       security-events: write
       packages: read
@@ -130,7 +130,6 @@ jobs:
     name: Build and Push dvc-sync Image (disable DVC pushes via sed)
     runs-on: ubuntu-latest
     needs: 
-    - pylint
     - codeql-analyze
 
     steps:
@@ -341,7 +340,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - model_validation
-    # - tests-service
 
     steps:
       - name: Checkout code
@@ -493,9 +491,7 @@ jobs:
   tests:
     name: Build all Docker Compose services (no run, no DVC/MLflow)
     runs-on: ubuntu-latest
-    needs: 
-    - pylint
-    - codeql-analyze
+    needs: codeql-analyze
 
     steps:
       - name: Checkout code
