@@ -81,25 +81,6 @@ services:
         condition: service_completed_successfully
     command: >
       sh -c "python plugins/cd4ml/model_validation/run_model_validation.py"
-  
-  tests:
-    build:
-      context: .
-      dockerfile: dockerfiles/tests/Dockerfile
-    volumes:
-      - .:/app
-      - dvc-cache:/app/.dvc/cache
-      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
-    working_dir: /app
-    env_file:
-      - .env
-    depends_on:
-      model_validation:
-        condition: service_completed_successfully
-      dvc-sync:
-        condition: service_completed_successfully
-    command: >
-      sh -c "dvc pull --force && pytest plugins/cd4ml/tests/test_predict_service.py -v -rA && dvc push"
 
   auth_service:
     build:
@@ -137,7 +118,36 @@ services:
       dvc-sync:
         condition: service_completed_successfully
     command: ["uvicorn", "plugins.cd4ml.inference.predict_service:predict_app", "--host", "0.0.0.0", "--port", "8002"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8002/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
   
-
+  tests:
+    build:
+      context: .
+      dockerfile: dockerfiles/tests/Dockerfile
+    volumes:
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume
+    working_dir: /app
+    env_file:
+      - .env
+    depends_on:
+      model_validation:
+        condition: service_completed_successfully
+      dvc-sync:
+        condition: service_completed_successfully
+      auth_service:
+        condition: service_healthy
+      predict_service:
+        condition: service_healthy
+    networks:
+      - default
+    command: >
+      sh -c "pytest plugins/cd4ml/tests/test_predict_service.py -v -rA"
+      
 volumes:
   dvc-cache:

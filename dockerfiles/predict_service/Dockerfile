@@ -4,19 +4,19 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies (including Git for DVC)
+# Install system dependencies (including Git for DVC and curl for health check)
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git \
+ && apt-get install -y --no-install-recommends git curl \
  && rm -rf /var/lib/apt/lists/*
 
 # copy requirements.txt
 COPY dockerfiles/predict_service/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+  && pip install --no-cache-dir "dvc[s3]"
 
 COPY . .
 
 # Download NLTK stopwords
-#RUN python -m nltk.downloader stopwords punkt wordnet 
 RUN python -c "import nltk; nltk.download('stopwords'); nltk.download('punkt'); nltk.download('wordnet'); nltk.download('punkt_tab')"
 
 # Expose port
