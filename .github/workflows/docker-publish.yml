@@ -128,7 +128,7 @@ jobs:
           pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q
 
   # ============================================================================
-  # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
+  # 4) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
   # ============================================================================
   dvc-sync:
     name: Build and Push dvc-sync Image (disable DVC pushes via sed)
@@ -179,7 +179,7 @@ jobs:
             echo "dvc-sync image unchanged, skipping push"
           fi
   # ============================================================================
-  # 4) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
+  # 5) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
   preprocessing:
     name: Build and Push preprocessing Image (disable DVC/MLflow pushes)
@@ -231,7 +231,7 @@ jobs:
             echo "preprocessing image unchanged, skipping push"
           fi
   # ============================================================================
-  # 5) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
+  # 6) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
   model_training:
     name: Build and Push model_training Image (disable DVC/MLflow pushes)
@@ -283,7 +283,7 @@ jobs:
             echo "model-training image unchanged, skipping push"
           fi
   # ============================================================================
-  # 6) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
+  # 7) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
   model_validation:
     name: Build and Push model_validation Image (disable DVC/MLflow pushes)
@@ -336,7 +336,7 @@ jobs:
           fi
 
   # ============================================================================
-  # 7) Build and push auth_service Image under single repo
+  # 8) Build and push auth_service Image under single repo
   # ============================================================================
   auth-service:
     name: Build and Push auth_service Image
@@ -384,7 +384,7 @@ jobs:
             echo "auth-service image unchanged, skipping push"
           fi
   # ============================================================================
-  # 8) Build and push predict_service Image under single repo
+  # 9) Build and push predict_service Image under single repo
   # ============================================================================
   predict-service:
     name: Build and Push predict_service Image
