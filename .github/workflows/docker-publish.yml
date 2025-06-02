@@ -43,17 +43,14 @@ jobs:
           pip install "dvc[s3]"
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
-
       - name: Pull only required DVC artifacts
         run: |
           dvc pull models/tfidf_vectorizer.pkl
           dvc pull models/sgd_text_model.pkl
           dvc pull models/product_dictionary.pkl
-
       - name: Run pytest in plugins/cd4ml/tests
         run: |
           pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q
-
   # ============================================================================
   # 2) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
   # ============================================================================
@@ -69,7 +66,6 @@ jobs:
       - name: Patch Dockerfile to disable DVC pushes
         run: |
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/dvc/Dockerfile
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -83,7 +79,6 @@ jobs:
       - name: Pull remote dvc-sync image if it exists
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync || true
-
       - name: Build local dvc-sync image
         run: |
           docker build \
@@ -91,7 +86,6 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync \
             -f dockerfiles/dvc/Dockerfile \
             .
-
       - name: Compare and push dvc-sync image only if changed
         run: |
           REMOTE_DIGEST=$(
@@ -108,7 +102,6 @@ jobs:
           else
             echo "dvc-sync image unchanged, skipping push"
           fi
-
   # ============================================================================
   # 3) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
@@ -125,7 +118,6 @@ jobs:
         run: |
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/preprocessing/Dockerfile || true
           sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/preprocessing/Dockerfile || true
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -139,7 +131,6 @@ jobs:
       - name: Pull remote preprocessing image if it exists
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing || true
-
       - name: Build local preprocessing image
         run: |
           docker build \
@@ -147,7 +138,6 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing \
             -f dockerfiles/preprocessing/Dockerfile \
             .
-
       - name: Compare and push preprocessing image only if changed
         run: |
           REMOTE_DIGEST=$(
@@ -164,7 +154,6 @@ jobs:
           else
             echo "preprocessing image unchanged, skipping push"
           fi
-
   # ============================================================================
   # 4) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
@@ -181,7 +170,6 @@ jobs:
         run: |
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_training/Dockerfile || true
           sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_training/Dockerfile || true
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -195,7 +183,6 @@ jobs:
       - name: Pull remote model-training image if it exists
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training || true
-
       - name: Build local model-training image
         run: |
           docker build \
@@ -203,7 +190,6 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training \
             -f dockerfiles/model_training/Dockerfile \
             .
-
       - name: Compare and push model-training image only if changed
         run: |
           REMOTE_DIGEST=$(
@@ -220,7 +206,6 @@ jobs:
           else
             echo "model-training image unchanged, skipping push"
           fi
-
   # ============================================================================
   # 5) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
@@ -237,7 +222,6 @@ jobs:
         run: |
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
           sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_validation/Dockerfile || true
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -251,7 +235,6 @@ jobs:
       - name: Pull remote model-validation image if it exists
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation || true
-
       - name: Build local model-validation image
         run: |
           docker build \
@@ -259,7 +242,6 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation \
             -f dockerfiles/model_validation/Dockerfile \
             .
-
       - name: Compare and push model-validation image only if changed
         run: |
           REMOTE_DIGEST=$(
@@ -276,7 +258,6 @@ jobs:
           else
             echo "model-validation image unchanged, skipping push"
           fi
-
   # ============================================================================
   # 6) Build and push tests Image under single repo
   # ============================================================================
@@ -302,7 +283,6 @@ jobs:
       - name: Pull remote tests image if it exists
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests || true
-
       - name: Build local tests image
         run: |
           docker build \
@@ -310,7 +290,6 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests \
             -f dockerfiles/tests/Dockerfile \
             .
-
       - name: Compare and push tests image only if changed
         run: |
           REMOTE_DIGEST=$(
@@ -327,7 +306,6 @@ jobs:
           else
             echo "tests image unchanged, skipping push"
           fi
-
   # ============================================================================
   # 7) Build and push auth_service Image under single repo
   # ============================================================================
@@ -355,7 +333,6 @@ jobs:
       - name: Pull remote auth-service image if it exists
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service || true
-
       - name: Build local auth-service image
         run: |
           docker build \
@@ -363,7 +340,6 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service \
             -f dockerfiles/auth_service/Dockerfile \
             .
-
       - name: Compare and push auth-service image only if changed
         run: |
           REMOTE_DIGEST=$(
@@ -380,7 +356,6 @@ jobs:
           else
             echo "auth-service image unchanged, skipping push"
           fi
-
   # ============================================================================
   # 8) Build and push predict_service Image under single repo
   # ============================================================================
@@ -409,7 +384,6 @@ jobs:
       - name: Pull remote predict-service image if it exists
         run: |
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service || true
-
       - name: Build local predict-service image
         run: |
           docker build \
@@ -417,7 +391,6 @@ jobs:
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service \
             -f dockerfiles/predict_service/Dockerfile \
             .
-
       - name: Compare and push predict-service image only if changed
         run: |
           REMOTE_DIGEST=$(
@@ -435,3 +408,39 @@ jobs:
             echo "predict-service image unchanged, skipping push"
           fi
   # ============================================================================
+  # 9) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
+  #    (no push, no run, no DVC/MLflow, just checking docker-compose build)
+  # ============================================================================
+  tests:
+    name: Build all Docker Compose services (no run, no DVC/MLflow)
+    runs-on: ubuntu-latest
+    #needs:
+      #- predict-service
+      #- model_validation
+      # - tests-service
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow and shared_volume copy
+        run: |
+          sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+          sed -i 's/^RUN cp -R shared_volume\/data/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN cp -R shared_volume\/models/# &/g' dockerfiles/tests/Dockerfile || true
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build all Docker Compose services (SKIP actual run)
+        run: |
+          docker compose build
+      - name: Build inference‐only Docker Compose services (SKIP actual run)
+        run: |
+          docker compose -f docker-compose.inference.yml build
