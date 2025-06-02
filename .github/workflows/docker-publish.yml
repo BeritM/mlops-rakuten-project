@@ -88,11 +88,12 @@ jobs:
           category: "/language:${{ matrix.language }}"
 
   # ============================================================================  
-  # 2) Dependency Review Action
+  # 3) Dependency Review Action (nur bei Pull Requests)
   # ============================================================================
   dependency-review:
     name: Dependency Review
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
     needs: codeql-analyze
     permissions:
       contents: read
