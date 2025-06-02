@@ -81,12 +81,9 @@ jobs:
         id: meta-dvc
         uses: docker/metadata-action@v5
         with:
-          # All images share the same repo: igurstein/rakuten_dev
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
           tags: |
-            # Literal tag "dvc-sync-<branch>"
             dvc-sync-${{ github.ref_name }}
-            # Also preserve semver tags (e.g. v1.2.3) if present
             type=semver,pattern=v*.*.*
 
       - name: Build & Push dvc-sync Image
@@ -95,9 +92,6 @@ jobs:
           context: .
           file: dockerfiles/dvc/Dockerfile
           push: true
-          # This will push under igurstein/rakuten_dev with tag(s):
-          #   dvc-sync-<branch>  (e.g. dvc-sync-main)
-          #   vX.Y.Z            (if a semver tag triggered the run)
           tags: ${{ steps.meta-dvc.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -241,10 +235,10 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # 6) Final Job: Build all Docker Compose services (no run, no DVC/MLflow)
+  # 6) Build and push auth_service Image under single repo
   # ============================================================================
-  tests:
-    name: Build all Docker Compose services (no run, no DVC/MLflow)
+  auth-service:
+    name: Build and Push auth_service Image
     runs-on: ubuntu-latest
     needs: model_validation
 
@@ -252,15 +246,101 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata for auth_service
+        id: meta-auth
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
+          tags: |
+            auth-service-${{ github.ref_name }}
+            type=semver,pattern=v*.*.*
+
+      - name: Build & Push auth_service Image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: dockerfiles/auth_service/Dockerfile
+          push: true
+          tags: ${{ steps.meta-auth.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 7) Build and push predict_service Image under single repo
+  # ============================================================================
+  predict-service:
+    name: Build and Push predict_service Image
+    runs-on: ubuntu-latest
+    needs:
+      - auth-service
+      - model_validation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract Docker metadata for predict_service
+        id: meta-predict
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}
+          tags: |
+            predict-service-${{ github.ref_name }}
+            type=semver,pattern=v*.*.*
+
+      - name: Build & Push predict_service Image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: dockerfiles/predict_service/Dockerfile
+          push: true
+          tags: ${{ steps.meta-predict.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # 8) Final Job: Build all Docker Compose services (no run, no DVC/MLflow)
+  # ============================================================================
+  tests:
+    name: Build all Docker Compose services (no run, no DVC/MLflow)
+    runs-on: ubuntu-latest
+    needs:
+      - predict-service
+      - model_validation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow and shared_volume copy
         run: |
-          # Comment out DVC/MLflow pulls/pushes & pytest in the test Dockerfile
+          # Comment out any DVC/MLflow pulls/pushes & pytest in the test Dockerfile
           sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
 
-          # Disable copying shared_volume folders if they do not exist
+          # Disable copying shared_volume if missing
           sed -i 's/^RUN cp -R shared_volume\/data/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN cp -R shared_volume\/models/# &/g' dockerfiles/tests/Dockerfile || true
 
@@ -273,5 +353,5 @@ jobs:
 
       - name: Build all Docker Compose services (SKIP actual run)
         run: |
-          # Use Docker Compose V2 syntax without running the containers
+          # Use Docker Compose V2 syntax without running containers
           docker compose build
