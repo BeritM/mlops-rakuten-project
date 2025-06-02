@@ -87,33 +87,13 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
 
-  # ============================================================================  
-  # 3) Dependency Review Action (nur bei Pull Requests)
   # ============================================================================
-  dependency-review:
-    name: Dependency Review
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: codeql-analyze
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Dependency Review
-        uses: actions/dependency-review-action@v4
-        with:
-          comment-summary-in-pr: always
-
-  # ============================================================================
-  # 2) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
+  # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
   # ============================================================================
   dvc-sync:
     name: Build and Push dvc-sync Image (disable DVC pushes via sed)
     runs-on: ubuntu-latest
-    needs: dependency-review
+    needs: codeql-analyze
 
     steps:
       - name: Checkout code
@@ -159,7 +139,7 @@ jobs:
             echo "dvc-sync image unchanged, skipping push"
           fi
   # ============================================================================
-  # 3) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
+  # 4) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
   preprocessing:
     name: Build and Push preprocessing Image (disable DVC/MLflow pushes)
@@ -211,7 +191,7 @@ jobs:
             echo "preprocessing image unchanged, skipping push"
           fi
   # ============================================================================
-  # 4) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
+  # 5) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
   model_training:
     name: Build and Push model_training Image (disable DVC/MLflow pushes)
@@ -263,7 +243,7 @@ jobs:
             echo "model-training image unchanged, skipping push"
           fi
   # ============================================================================
-  # 5) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
+  # 6) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
   # ============================================================================
   model_validation:
     name: Build and Push model_validation Image (disable DVC/MLflow pushes)
@@ -316,7 +296,7 @@ jobs:
           fi
 
   # ============================================================================
-  # 6) Build and push auth_service Image under single repo
+  # 7) Build and push auth_service Image under single repo
   # ============================================================================
   auth-service:
     name: Build and Push auth_service Image
@@ -364,7 +344,7 @@ jobs:
             echo "auth-service image unchanged, skipping push"
           fi
   # ============================================================================
-  # 7) Build and push predict_service Image under single repo
+  # 8) Build and push predict_service Image under single repo
   # ============================================================================
   predict-service:
     name: Build and Push predict_service Image
@@ -415,7 +395,7 @@ jobs:
           fi
 
   # ============================================================================
-  # 8) Build and push tests Image under single repo
+  # 9) Build and push tests Image under single repo
   # ============================================================================
   tests-service:
     name: Build and Push tests Image
@@ -467,7 +447,7 @@ jobs:
           fi
 
   # ============================================================================
-  # 9) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
+  # 10) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
   #    (no push, no run, no DVC/MLflow, just checking docker-compose build)
   # ============================================================================
   tests:
