@@ -246,12 +246,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow
+      - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow and shared_volume copy
         run: |
+          # Kommentiere alle dvc pull/push & pytest aus
           sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
           sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+
+          # **NEU**: Kommentiere "cp -R shared_volume/…" aus im Test-Dockerfile,
+          # damit das Fehlen von shared_volume/models nicht zum Fehler führt:
+          sed -i 's/^RUN cp -R shared_volume\/data/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN cp -R shared_volume\/models/# &/g' dockerfiles/tests/Dockerfile || true
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -262,5 +268,5 @@ jobs:
 
       - name: Build all Docker Compose services (SKIP actual run)
         run: |
-          # Statt "docker-compose build" verwenden wir "docker compose build"
+          # Nutze Docker Compose V2 (ohne Bindestrich)
           docker compose build
