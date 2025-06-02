@@ -20,7 +20,7 @@ SECRET_KEY = "your_secret_key_here"
 ALGORITHM = "HS256"
 
 # --- Globals ---
-FEEDBACK_CSV_PATH = None
+#FEEDBACK_CSV_PATH = os.path.join(os.getenv("FEEDBACK_DIR"), os.getenv("FEEDBACK_DATA"))
 predictor: Optional[ProductTypePredictorMLflow] = None
 prod_model_version = None
 model_params = {}
@@ -56,6 +56,7 @@ class FeedbackEntry(BaseModel):
 # --- Startup Hook ---
 @predict_app.on_event("startup")
 def startup():
+    #global predictor, prod_model_version, model_params, model_metrics, label_to_code, valid_labels
     global FEEDBACK_CSV_PATH, predictor, prod_model_version, model_params, model_metrics, label_to_code, valid_labels
 
     # Load env variables
@@ -154,6 +155,8 @@ def predict_product_type(request: PredictionRequest, user=Depends(verify_token))
 
 @predict_app.post("/feedback")
 def submit_feedback(entry: FeedbackEntry, user=Depends(verify_token)):
+    print(f"DEBUG: FEEDBACK_CSV_PATH aktuell: {FEEDBACK_CSV_PATH}")
+    print(f"DEBUG: Typ von FEEDBACK_CSV_PATH: {type(FEEDBACK_CSV_PATH)}")
     if FEEDBACK_CSV_PATH is None:
         raise HTTPException(status_code=503, detail="Feedback is not enabled.")
 

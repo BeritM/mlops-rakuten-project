@@ -60,6 +60,10 @@ if 'show_prediction_message' not in st.session_state:
     st.session_state.show_prediction_message = False
 if "show_upload_message" not in st.session_state:
     st.session_state.show_upload_message = False
+if 'upload_status_message' not in st.session_state: 
+    st.session_state.upload_status_message = None
+if 'upload_status_type' not in st.session_state: 
+    st.session_state.upload_status_type = None
 if 'selected_category_from_dropdown_index' not in st.session_state: # To control selectbox index
     st.session_state.selected_category_from_dropdown_index = 0
 if 'confirmed_category' not in st.session_state:
@@ -72,7 +76,7 @@ SELECT_TEXT = "-- Select a category --"
 CHOOSE_OTHER_CATEGORY_TEXT = "-- Choose another category --"
 
 # --- Helper Functions for API Calls ---
-reponse = None
+response = None
 
 def login_user(username, password):
     """
@@ -189,6 +193,39 @@ def get_model_info():
         st.error(f"Error details: {response.text}")
         return None
     
+def send_feedback(designation, description, predicted_label, correct_label, access_token):
+    """
+    Sends feedback about a prediction to the predict API.
+    Requires authentication.
+    """
+    headers = {"token": access_token}
+    #headers = {"Authorization": f"Bearer {access_token}"}
+    payload = {
+        "designation": designation,
+        "description": description,
+        "predicted_label": predicted_label,
+        "correct_label": correct_label
+    }
+    #response = None
+    try:
+        response = requests.post(
+            f"{PREDICT_API_BASE_URL}/feedback",
+            json=payload,
+            headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"Failed to upload article: {e}")
+        if response is not None:
+            st.error(f"Server response: {response.text}")
+        else:
+            st.error("No response from server.")
+        return None
+
+   
+# --- UI Callback Functions ---
+
 def prepare_dropdown_options(product_dict, predicted_category):
     """
     Prepares a list of categories for the dropdown.
@@ -205,8 +242,6 @@ def prepare_dropdown_options(product_dict, predicted_category):
         if category != predicted_category:  
             options.append(category)
     return options
-    
-# --- UI Callback Functions ---
 
 def handle_predict_button_click():
     """
@@ -218,6 +253,9 @@ def handle_predict_button_click():
     st.session_state.confirmed_category = None # Clear any previous confirmation
     st.session_state.show_prediction_message = False # Reset message visibility
     st.session_state.show_all_categories = False
+    st.session_state.show_upload_message = False
+    st.session_state.upload_status_message = None
+    st.session_state.upload_status_type = None
 
     designation = st.session_state.designation_input
     description = st.session_state.description_input
@@ -244,9 +282,39 @@ def handle_confirm_category_click(selected_category_value):
     current_selection = selected_category_value
 
     if current_selection != SELECT_TEXT and current_selection != CHOOSE_OTHER_CATEGORY_TEXT:
+        confirmed_category = current_selection
+
+        # Data for feedback submission
+        designation_to_send = st.session_state.designation_input
+        description_to_send = st.session_state.description_input
+        predicted_label_to_send = st.session_state.last_prediction
+        correct_label_to_send  = confirmed_category
+        
+        if not designation_to_send or not predicted_label_to_send or not correct_label_to_send or not st.session_state.access_token:
+            st.session_state.upload_status_message = "Error: Missing required fields: designation, predicted label, correct label or access token"
+            st.session_state.upload_status_type = "error"
+            st.session_state.show_upload_message = True
+            return
+
+        # Send feedback to the API
+        feedback_result = send_feedback(
+            designation_to_send,
+            description_to_send,
+            predicted_label_to_send,
+            correct_label_to_send,
+            st.session_state.access_token)
+        
+        
+        if feedback_result and feedback_result.get("status") == "success":
+            st.session_state.upload_status_message = f"Article uploaded successfully in category {confirmed_category}."
+            st.session_state.upload_status_type = "success"
+        else:
+            st.session_state.upload_status_message = f"Error: Failed to upload article in category {confirmed_category}."
+            st.session_state.upload_status_type = "error"
+
+        
         st.session_state.show_upload_message = True
         st.session_state.confirmed_category = current_selection
-
         # a) Clear input fields and reset dropdown after confirmation
         st.session_state.designation_input = ""
         st.session_state.description_input = ""
@@ -380,12 +448,25 @@ else:
         
     
     message_placeholder = st.empty()
-    if 'show_upload_message' in st.session_state and st.session_state.show_upload_message:    
-        if st.session_state.get('confirmed_category'):
-            message_placeholder.success(f"Article uploaded in category **'{st.session_state.confirmed_category}'**")
-            time.sleep(3)
-            message_placeholder.empty()
-            st.session_state.show_upload_message = False
+    #if 'show_upload_message' in st.session_state and st.session_state.show_upload_message:    
+    #    if st.session_state.get('confirmed_category'):
+    #        message_placeholder.success(f"Article uploaded in category **'{st.session_state.confirmed_category}'**")
+    #        time.sleep(3)
+    #        message_placeholder.empty()
+    #        st.session_state.show_upload_message = False
+
+    if st.session_state.get('show_upload_message') and st.session_state.upload_status_message:
+        if st.session_state.upload_status_type == "success":
+            message_placeholder.success(st.session_state.upload_status_message)
+        elif st.session_state.upload_status_type == "error":
+            message_placeholder.error(st.session_state.upload_status_message)
+
+        time.sleep(3) 
+
+        message_placeholder.empty() 
+        st.session_state.show_upload_message = False 
+        st.session_state.upload_status_message = None 
+        st.session_state.upload_status_type = None 
 
 
     
