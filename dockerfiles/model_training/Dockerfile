@@ -8,7 +8,7 @@ RUN apt-get update \
 
 COPY dockerfiles/model_training/requirements-model.txt ./requirements-model.txt
 RUN pip install --no-cache-dir -r requirements-model.txt
-RUN pip install --no-cache-dir "dvc[s3]"      # CHANGED
+RUN pip install --no-cache-dir "dvc[s3]"  
 
 COPY . .
 

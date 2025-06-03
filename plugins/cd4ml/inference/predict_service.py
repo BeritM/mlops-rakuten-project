@@ -5,6 +5,8 @@ import joblib
 import mlflow
 from datetime import datetime
 from typing import Optional
+from dvc_push_manager import track_and_push_with_retry
+import threading
 
 from fastapi import FastAPI, Depends, HTTPException, status, Header
 from pydantic import BaseModel
@@ -38,6 +40,20 @@ def verify_token(token: str = Header(...)):
         return payload
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+# --- DVC Push Helper ---
+def _async_track_and_push(description: str) -> None:
+    def _worker():
+        try:
+            ok = track_and_push_with_retry(description=description, max_retries=3)
+            if ok:
+                print("[INFO] DVC/Git push succeeded.")
+            else:
+                print("[WARNING] DVC/Git push completed with warnings.")
+        except Exception as e:
+            print(f"[ERROR] DVC/Git push failed: {e}")
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 # --- Pydantic Models ---
 class PredictionRequest(BaseModel):
@@ -98,18 +114,18 @@ def startup():
         print(f"[INFO] Model loaded successfully.")
 
         print(f"[DEBUG] Downloading vectorizer...")
-        # vectorizer_path_dir = client.download_artifacts(run_id=run_id, path="vectorizer")
-        # vectorizer_path = os.path.join(vectorizer_path_dir, "tfidf_vectorizer.pkl")
-        # print(f"[INFO] Vectorizer path: {vectorizer_path}")
-        vectorizer_path = "/app/models/tfidf_vectorizer.pkl"
-        print(f"[INFO] Using local vectorizer: {vectorizer_path}")
+        vectorizer_path_dir = client.download_artifacts(run_id=run_id, path="vectorizer")
+        vectorizer_path = os.path.join(vectorizer_path_dir, "tfidf_vectorizer.pkl")
+        print(f"[INFO] Vectorizer path: {vectorizer_path}")
+        # vectorizer_path = "/app/models/tfidf_vectorizer.pkl"
+        print(f"[INFO] Using remote vectorizer: {vectorizer_path}")
 
         print(f"[DEBUG] Downloading product dictionary...")
-        # product_dict_dir = client.download_artifacts(run_id=run_id, path="product_dictionary")
-        # product_dictionary_path = os.path.join(product_dict_dir, "product_dictionary.pkl")
-        # print(f"[INFO] Product dictionary path: {product_dictionary_path}")
-        product_dictionary_path = "/app/models/product_dictionary.pkl"
-        print(f"[INFO] Using local product dictionary: {product_dictionary_path}")
+        product_dict_dir = client.download_artifacts(run_id=run_id, path="product_dictionary")
+        product_dictionary_path = os.path.join(product_dict_dir, "product_dictionary.pkl")
+        print(f"[INFO] Product dictionary path: {product_dictionary_path}")
+        # product_dictionary_path = "/app/models/product_dictionary.pkl"
+        print(f"[INFO] Using remote product dictionary: {product_dictionary_path}")
 
 
         with open(product_dictionary_path, "rb") as f:
@@ -151,6 +167,10 @@ def predict_product_type(request: PredictionRequest, user=Depends(verify_token))
     prediction = predictor.predict(request.designation, request.description)
     return {"predicted_class": prediction}
 
+@predict_app.get("/health")
+def health_check():
+    return {"status": "healthy", "service": "predict_service"}
+
 @predict_app.post("/feedback")
 def submit_feedback(entry: FeedbackEntry, user=Depends(verify_token)):
     if FEEDBACK_CSV_PATH is None:
@@ -184,5 +204,7 @@ def submit_feedback(entry: FeedbackEntry, user=Depends(verify_token)):
         if not file_exists:
             writer.writeheader()
         writer.writerow(feedback_data)
+        
+    _async_track_and_push(description="append feedback entry")  
 
     return {"status": "success", "message": "Feedback recorded."}
