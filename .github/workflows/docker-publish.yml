@@ -486,10 +486,10 @@ jobs:
             echo "tests image unchanged, skipping push"
           fi
 
-  ============================================================================
-  11) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
-     (no push, no run, no DVC/MLflow, just checking docker-compose build)
-  ============================================================================
+  #============================================================================
+  #11) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
+  #   (no push, no run, no DVC/MLflow, just checking docker-compose build)
+  #============================================================================
   tests:
     name: Build all Docker Compose services (no run, no DVC/MLflow)
     runs-on: ubuntu-latest
