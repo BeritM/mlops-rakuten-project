@@ -151,6 +151,10 @@ def predict_product_type(request: PredictionRequest, user=Depends(verify_token))
     prediction = predictor.predict(request.designation, request.description)
     return {"predicted_class": prediction}
 
+@predict_app.get("/health")
+def health_check():
+    return {"status": "healthy", "service": "predict_service"}
+
 @predict_app.post("/feedback")
 def submit_feedback(entry: FeedbackEntry, user=Depends(verify_token)):
     if FEEDBACK_CSV_PATH is None:
