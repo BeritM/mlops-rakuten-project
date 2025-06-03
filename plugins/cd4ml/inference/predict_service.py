@@ -5,6 +5,8 @@ import joblib
 import mlflow
 from datetime import datetime
 from typing import Optional
+from dvc_push_manager import track_and_push_with_retry
+import threading
 
 from fastapi import FastAPI, Depends, HTTPException, status, Header
 from pydantic import BaseModel
@@ -38,6 +40,20 @@ def verify_token(token: str = Header(...)):
         return payload
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+# --- DVC Push Helper ---
+def _async_track_and_push(description: str) -> None:
+    def _worker():
+        try:
+            ok = track_and_push_with_retry(description=description, max_retries=3)
+            if ok:
+                print("[INFO] DVC/Git push succeeded.")
+            else:
+                print("[WARNING] DVC/Git push completed with warnings.")
+        except Exception as e:
+            print(f"[ERROR] DVC/Git push failed: {e}")
+
+    threading.Thread(target=_worker, daemon=True).start()
 
 # --- Pydantic Models ---
 class PredictionRequest(BaseModel):
@@ -188,5 +204,7 @@ def submit_feedback(entry: FeedbackEntry, user=Depends(verify_token)):
         if not file_exists:
             writer.writeheader()
         writer.writerow(feedback_data)
+        
+    _async_track_and_push(description="append feedback entry")  
 
     return {"status": "success", "message": "Feedback recorded."}

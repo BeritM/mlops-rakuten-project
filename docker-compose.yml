@@ -103,7 +103,7 @@ services:
       dockerfile: "dockerfiles/predict_service/Dockerfile"
     env_file:
       - .env
-    environment:
+    environment: # eventually insert completely into .env
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
       - GITHUB_TOKEN=${GITHUB_TOKEN}
@@ -112,6 +112,8 @@ services:
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
+      - DATA_FEEDBACK_DIR=/app/data/feedback
+      - FEEDBACK_CSV_PATH=feedback.csv
     ports:
       - "8002:8002"
     volumes:
