@@ -13,6 +13,8 @@ from pydantic import BaseModel
 from jose import jwt, JWTError
 from mlflow.tracking import MlflowClient
 from plugins.cd4ml.data_processing.preprocessing_core import ProductTypePredictorMLflow
+from plugins.cd4ml.inference.utils import generate_id
+
 
 # --- FastAPI App ---
 predict_app = FastAPI()
@@ -195,6 +197,8 @@ def submit_feedback(entry: FeedbackEntry, user=Depends(verify_token)):
         "predicted_label": entry.predicted_label,
         "correct_code": correct_code,
         "correct_label": entry.correct_label,
+        "productid": generate_id(10),
+        "imageid": generate_id(12),
         "is_correct": is_correct
     }
 
