@@ -85,7 +85,7 @@ def startup():
 
     # Load environment variables
     feedback_dir = os.getenv("DATA_FEEDBACK_DIR")
-    feedback_filename = os.getenv("FEEDBACK_CSV_PATH")
+    feedback_filename = os.getenv("FEEDBACK_CSV")
     dagshub_user = os.getenv("DAGSHUB_USER_NAME")
     dagshub_token = os.getenv("DAGSHUB_USER_TOKEN")
     repo_owner = os.getenv("DAGSHUB_REPO_OWNER")
