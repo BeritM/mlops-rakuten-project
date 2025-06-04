@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir dvc[s3]   #### Max ####
 
 # Install DVC CLI so that "dvc push" is available
-RUN pip install --no-cache-dir "dvc[s3]"      # CHANGED
+# RUN pip install --no-cache-dir "dvc[s3]"      # CHANGED <-- doppelt
 
 # Copy requirements.txt
 COPY dockerfiles/preprocessing/requirements.txt .
