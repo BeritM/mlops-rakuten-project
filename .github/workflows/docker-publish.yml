@@ -1,0 +1,428 @@
+name: Pytest, Build & Push Single Docker Services, and Docker Compose Build
+
+# This workflow runs pylint on the Python code first, then pytest tests, builds and pushes Docker images for various services,
+# and checks Docker Compose build without running containers.
+# It is triggered on pushes or pull requests to the main, develop, or dev_new-feature-githubactions branches.
+
+# Avoids concurrency issues by grouping jobs under the same workflow and branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Trigger: push or PR to main, develop, dev_new-feature-githubactions
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  # Docker Hub namespace
+  REGISTRY: docker.io
+  IMAGE_PREFIX: igurstein/rakuten_dev
+
+jobs:
+  # ============================================================================
+  # 1) CodeQL Security & Quality Analysis 
+  # This job analyzes the code for security vulnerabilities and quality issues like unused imports and variables etc.
+  # ============================================================================
+  codeql-analyze:
+    name: CodeQL Advanced Analyse
+    runs-on: ubuntu-latest
+    #needs: pylint
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      - if: matrix.build-mode == 'manual'
+        shell: bash
+        run: |
+          echo 'Du hast build-mode="manual" gewählt – hier die Kommandos zum Bauen einfügen'
+          exit 1
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ============================================================================
+  # 2) Run Pytest Tests (ignorieres test_predict_service.py, because service needs to be running, which is not the case in this workflow 
+  # + without DVC pull, because we test only the python code itself, not the data or models, hence no DVC pull needed)
+  # ============================================================================
+  pytest-tests:
+    name: Run pytest tests (ignoring test_predict_service.py)
+    needs: codeql-analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
+
+      - name: Check Pytest installation
+        run: |
+          which pytest || echo "Pytest not found!"
+          pytest --version
+
+      - name: Run pytest in plugins/cd4ml/tests (ignoring test_predict_service.py)
+        run: |
+          pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q \
+            --ignore=plugins/cd4ml/tests/test_predict_service.py
+
+  # ============================================================================
+  # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
+  # ============================================================================
+  dvc-sync:
+    name: Build and Push dvc-sync Image
+    runs-on: ubuntu-latest
+    needs:
+      - codeql-analyze
+      - pytest-tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfile to disable DVC pushes
+        run: |
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/dvc/Dockerfile
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull remote dvc-sync image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync || true
+
+      - name: Build local dvc-sync image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync \
+            -f dockerfiles/dvc/Dockerfile \
+            .
+
+      - name: Push dvc-sync image to Docker Hub
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync
+
+  # ============================================================================
+  # 4) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
+  # ============================================================================
+  preprocessing:
+    name: Build and Push preprocessing Image
+    runs-on: ubuntu-latest
+    needs: dvc-sync
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfile to disable DVC/MLflow pushes
+        run: |
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/preprocessing/Dockerfile || true
+          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/preprocessing/Dockerfile || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull remote preprocessing image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing || true
+
+      - name: Build local preprocessing image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing \
+            -f dockerfiles/preprocessing/Dockerfile \
+            .
+
+      - name: Push preprocessing image to Docker Hub
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing
+
+  # ============================================================================
+  # 5) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
+  # ============================================================================
+  model_training:
+    name: Build and Push model_training Image
+    runs-on: ubuntu-latest
+    needs: preprocessing
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfile to disable DVC/MLflow pushes
+        run: |
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_training/Dockerfile || true
+          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_training/Dockerfile || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull remote model-training image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training || true
+
+      - name: Build local model-training image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training \
+            -f dockerfiles/model_training/Dockerfile \
+            .
+
+      - name: Push model-training image to Docker Hub
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training
+
+  # ============================================================================
+  # 6) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
+  # ============================================================================
+  model_validation:
+    name: Build and Push model_validation Image
+    runs-on: ubuntu-latest
+    needs: model_training
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfile to disable DVC/MLflow pushes
+        run: |
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull remote model-validation image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation || true
+
+      - name: Build local model-validation image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation \
+            -f dockerfiles/model_validation/Dockerfile \
+            .
+
+      - name: Push model-validation image to Docker Hub
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation
+
+  # ============================================================================
+  # 7) Build and push auth_service Image under single repo
+  # ============================================================================
+  auth-service:
+    name: Build and Push auth_service Image
+    runs-on: ubuntu-latest
+    needs: model_validation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull remote auth-service image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service || true
+
+      - name: Build local auth-service image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service \
+            -f dockerfiles/auth_service/Dockerfile \
+            .
+
+      - name: Push auth-service image to Docker Hub
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service
+
+  # ============================================================================
+  # 8) Build and push predict_service Image under single repo
+  # ============================================================================
+  predict-service:
+    name: Build and Push predict_service Image
+    runs-on: ubuntu-latest
+    needs:
+      - auth-service
+      - model_validation
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull remote predict-service image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service || true
+
+      - name: Build local predict-service image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service \
+            -f dockerfiles/predict_service/Dockerfile \
+            .
+
+      - name: Push predict-service image to Docker Hub
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service
+
+  # ============================================================================
+  # 9) Build and push tests Image
+  # ============================================================================
+  tests-service:
+    name: Build and Push tests Image
+    runs-on: ubuntu-latest
+    needs:
+      - auth-service
+      - model_validation
+      - predict-service
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull remote tests image if it exists
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests || true
+
+      - name: Build local tests image
+        run: |
+          docker build \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests \
+            -f dockerfiles/tests/Dockerfile \
+            .
+
+      - name: Push tests image to Docker Hub
+        run: |
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests
+
+  #============================================================================
+  #10) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
+  #   (no push, no run, no DVC/MLflow, just checking docker-compose build from the compose files and not the individual Dockerfiles anymore).
+  #============================================================================
+  tests:
+    name: Build (no Push) Docker Compose files
+    runs-on: ubuntu-latest
+    needs: tests-service
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow and shared_volume copy
+        run: |
+          sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+          sed -i 's/^RUN cp -R shared_volume\/data/# &/g' dockerfiles/tests/Dockerfile || true
+          sed -i 's/^RUN cp -R shared_volume\/models/# &/g' dockerfiles/tests/Dockerfile || true
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build all Docker Compose services (SKIP actual run)
+        run: |
+          docker compose build
+
+      - name: Build inference‐only Docker Compose services (SKIP actual run)
+        run: |
+          docker compose -f docker-compose.inference.yml build
