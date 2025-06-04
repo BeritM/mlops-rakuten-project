@@ -23,7 +23,7 @@ env:
 
 jobs:
   # ============================================================================
-  # 1) Lint the Python code with Pylint
+  # 1) Lint the Python code with Pylint <- does not work currently.
   # ============================================================================
   # pylint:
   #   name: Lint Python code with Pylint
@@ -90,7 +90,7 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
 
-    # ============================================================================  
+  # ============================================================================  
   # 2) Run Pytest Tests (ignorieres test_predict_service.py, because service needs to be running, which is not the case in this workflow 
   # + without DVC pull, because we test only the python code itself, not the data or models, hence no DVC pull needed)
   # ============================================================================  
@@ -125,7 +125,7 @@ jobs:
             --ignore=plugins/cd4ml/tests/test_predict_service.py
 
   
-  ####################### dvc no longer used ########################
+  ####################### previous pytest: dvc no longer used ########################
   # pytest-tests:
   #   name: Run pytest tests (with DVC Pull)
   #   needs: codeql-analyze
