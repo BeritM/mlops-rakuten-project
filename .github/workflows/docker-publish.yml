@@ -23,33 +23,6 @@ env:
 
 jobs:
   # ============================================================================
-  # 1) Lint the Python code with Pylint <- does not work currently.
-  # ============================================================================
-  # pylint:
-  #   name: Lint Python code with Pylint
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     matrix:
-  #       python-version: ["3.9"]
-  #
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Set up Python ${{ matrix.python-version }}
-  #       uses: actions/setup-python@v4
-  #       with:
-  #         python-version: ${{ matrix.python-version }}
-  #
-  #     - name: Install dependencies for linting
-  #       run: |
-  #         python -m pip install --upgrade pip pylint
-  #
-  #     - name: Run pylint
-  #       run: |
-  #         pylint .
-
-  # ============================================================================
   # 1) CodeQL Security & Quality Analysis 
   # This job analyzes the code for security vulnerabilities and quality issues like unused imports and variables etc.
   # ============================================================================
@@ -124,43 +97,6 @@ jobs:
         run: |
           pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q \
             --ignore=plugins/cd4ml/tests/test_predict_service.py
-
-  ####################### previous pytest: dvc no longer used ########################
-  # pytest-tests:
-  #   name: Run pytest tests (with DVC Pull)
-  #   needs: codeql-analyze
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v4
-  #       with:
-  #         python-version: '3.9'
-  #
-  #     - name: Install Python dependencies and DVC
-  #       run: |
-  #         python -m pip install --upgrade pip
-  #         pip install "dvc[s3]" pytest
-  #         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-  #         if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-  #         if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
-  #
-  #     - name: Check DVC and Pytest installation
-  #       run: |
-  #         which dvc || echo "DVC not found!"
-  #         which pytest || echo "Pytest not found!"
-  #         dvc --version
-  #         pytest --version
-  #
-  #     - name: Pull only required DVC artifacts
-  #       run: |
-  #         dvc pull models/tfidf_vectorizer.pkl
-  #         dvc pull models/sgd_text_model.pkl
-  #         dvc pull models/product_dictionary.pkl
-  #
-  #     - name: Run pytest in plugins/cd4ml/tests
-  #       run: |
-  #         pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q
 
   # ============================================================================
   # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
@@ -459,7 +395,7 @@ jobs:
   #   (no push, no run, no DVC/MLflow, just checking docker-compose build from the compose files and not the individual Dockerfiles anymore).
   #============================================================================
   tests:
-    name: Build all Docker Compose services (no run, no DVC/MLflow)
+    name: Build (no Push) Docker Compose files
     runs-on: ubuntu-latest
     needs: tests-service
 
