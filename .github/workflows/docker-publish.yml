@@ -90,11 +90,12 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
 
-  # ============================================================================  
-  # 2) Run Pytest Tests
+    # ============================================================================  
+  # 2) Run Pytest Tests (ignorieres test_predict_service.py, because service needs to be running, which is not the case in this workflow 
+  # + without DVC pull, because we test only the python code itself, not the data or models, hence no DVC pull needed)
   # ============================================================================  
   pytest-tests:
-    name: Run pytest tests (with DVC Pull)
+    name: Run pytest tests (ignoring test_predict_service.py)
     needs: codeql-analyze
     runs-on: ubuntu-latest
     steps:
@@ -105,30 +106,62 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install Python dependencies and DVC
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install "dvc[s3]" pytest
+          pip install pytest
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
           if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
 
-      - name: Check DVC and Pytest installation
+      - name: Check Pytest installation
         run: |
-          which dvc || echo "DVC not found!"
           which pytest || echo "Pytest not found!"
-          dvc --version
           pytest --version
 
-      - name: Pull only required DVC artifacts
+      - name: Run pytest in plugins/cd4ml/tests (ignoring test_predict_service.py)
         run: |
-          dvc pull models/tfidf_vectorizer.pkl
-          dvc pull models/sgd_text_model.pkl
-          dvc pull models/product_dictionary.pkl
+          pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q \
+            --ignore=plugins/cd4ml/tests/test_predict_service.py
 
-      - name: Run pytest in plugins/cd4ml/tests
-        run: |
-          pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q
+  
+  ####################### dvc no longer used ########################
+  # pytest-tests:
+  #   name: Run pytest tests (with DVC Pull)
+  #   needs: codeql-analyze
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Set up Python
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: '3.9'
+
+  #     - name: Install Python dependencies and DVC
+  #       run: |
+  #         python -m pip install --upgrade pip
+  #         pip install "dvc[s3]" pytest
+  #         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+  #         if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+  #         if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
+
+  #     - name: Check DVC and Pytest installation
+  #       run: |
+  #         which dvc || echo "DVC not found!"
+  #         which pytest || echo "Pytest not found!"
+  #         dvc --version
+  #         pytest --version
+
+  #     - name: Pull only required DVC artifacts
+  #       run: |
+  #         dvc pull models/tfidf_vectorizer.pkl
+  #         dvc pull models/sgd_text_model.pkl
+  #         dvc pull models/product_dictionary.pkl
+
+  #     - name: Run pytest in plugins/cd4ml/tests
+  #       run: |
+  #         pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q
 
  # ============================================================================  
   # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
