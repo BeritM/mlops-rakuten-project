@@ -31,27 +31,28 @@ jobs:
   #   strategy:
   #     matrix:
   #       python-version: ["3.9"]
-
+  #
   #   steps:
   #     - name: Checkout code
   #       uses: actions/checkout@v4
-
+  #
   #     - name: Set up Python ${{ matrix.python-version }}
   #       uses: actions/setup-python@v4
   #       with:
   #         python-version: ${{ matrix.python-version }}
-
+  #
   #     - name: Install dependencies for linting
   #       run: |
   #         python -m pip install --upgrade pip pylint
-
+  #
   #     - name: Run pylint
   #       run: |
   #         pylint .
 
-  # ============================================================================  
-  # 1) CodeQL Security & Quality Analysis
-  # ============================================================================  
+  # ============================================================================
+  # 1) CodeQL Security & Quality Analysis 
+  # This job analyzes the code for security vulnerabilities and quality issues like unused imports and variables etc.
+  # ============================================================================
   codeql-analyze:
     name: CodeQL Advanced Analyse
     runs-on: ubuntu-latest
@@ -90,10 +91,10 @@ jobs:
         with:
           category: "/language:${{ matrix.language }}"
 
-  # ============================================================================  
+  # ============================================================================
   # 2) Run Pytest Tests (ignorieres test_predict_service.py, because service needs to be running, which is not the case in this workflow 
   # + without DVC pull, because we test only the python code itself, not the data or models, hence no DVC pull needed)
-  # ============================================================================  
+  # ============================================================================
   pytest-tests:
     name: Run pytest tests (ignoring test_predict_service.py)
     needs: codeql-analyze
@@ -124,7 +125,6 @@ jobs:
           pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q \
             --ignore=plugins/cd4ml/tests/test_predict_service.py
 
-  
   ####################### previous pytest: dvc no longer used ########################
   # pytest-tests:
   #   name: Run pytest tests (with DVC Pull)
@@ -132,12 +132,11 @@ jobs:
   #   runs-on: ubuntu-latest
   #   steps:
   #     - uses: actions/checkout@v4
-
   #     - name: Set up Python
   #       uses: actions/setup-python@v4
   #       with:
   #         python-version: '3.9'
-
+  #
   #     - name: Install Python dependencies and DVC
   #       run: |
   #         python -m pip install --upgrade pip
@@ -145,33 +144,33 @@ jobs:
   #         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
   #         if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
   #         if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
-
+  #
   #     - name: Check DVC and Pytest installation
   #       run: |
   #         which dvc || echo "DVC not found!"
   #         which pytest || echo "Pytest not found!"
   #         dvc --version
   #         pytest --version
-
+  #
   #     - name: Pull only required DVC artifacts
   #       run: |
   #         dvc pull models/tfidf_vectorizer.pkl
   #         dvc pull models/sgd_text_model.pkl
   #         dvc pull models/product_dictionary.pkl
-
+  #
   #     - name: Run pytest in plugins/cd4ml/tests
   #       run: |
   #         pytest plugins/cd4ml/tests --maxfail=1 --disable-warnings -q
 
- # ============================================================================  
+  # ============================================================================
   # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
-  # ============================================================================  
+  # ============================================================================
   dvc-sync:
-    name: Build and Push dvc-sync Image (disable DVC pushes via sed)
+    name: Build and Push dvc-sync Image
     runs-on: ubuntu-latest
-    needs: 
-    - codeql-analyze
-    - pytest-tests
+    needs:
+      - codeql-analyze
+      - pytest-tests
 
     steps:
       - name: Checkout code
@@ -203,34 +202,15 @@ jobs:
             -f dockerfiles/dvc/Dockerfile \
             .
 
-      - name: Compare and push dvc-sync image
+      - name: Push dvc-sync image to Docker Hub
         run: |
-          REMOTE_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync 2>/dev/null \
-            || echo ""
-          )
-          LOCAL_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync 2>/dev/null \
-            || echo ""
-          )
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync
 
-          echo "Remote digest: $REMOTE_DIGEST"
-          echo "Local  digest: $LOCAL_DIGEST"
-
-          if [ -z "$REMOTE_DIGEST" ] || [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
-            echo "Push dvc-sync image to Docker Hub"
-            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync
-          else
-            echo "dvc-sync image unchanged, skipping push"
-          fi
-
-  # ============================================================================  
+  # ============================================================================
   # 4) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
-  # ============================================================================  
+  # ============================================================================
   preprocessing:
-    name: Build and Push preprocessing Image (disable DVC/MLflow pushes)
+    name: Build and Push preprocessing Image
     runs-on: ubuntu-latest
     needs: dvc-sync
 
@@ -265,34 +245,15 @@ jobs:
             -f dockerfiles/preprocessing/Dockerfile \
             .
 
-      - name: Compare and push preprocessing image
+      - name: Push preprocessing image to Docker Hub
         run: |
-          REMOTE_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing 2>/dev/null \
-            || echo ""
-          )
-          LOCAL_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing 2>/dev/null \
-            || echo ""
-          )
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing
 
-          echo "Remote digest: $REMOTE_DIGEST"
-          echo "Local  digest: $LOCAL_DIGEST"
-
-          if [ -z "$REMOTE_DIGEST" ] || [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
-            echo "Push preprocessing image to Docker Hub"
-            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing
-          else
-            echo "preprocessing image unchanged, skipping push"
-          fi
-
-  # ============================================================================  
+  # ============================================================================
   # 5) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
-  # ============================================================================  
+  # ============================================================================
   model_training:
-    name: Build and Push model_training Image (disable DVC/MLflow pushes)
+    name: Build and Push model_training Image
     runs-on: ubuntu-latest
     needs: preprocessing
 
@@ -327,34 +288,15 @@ jobs:
             -f dockerfiles/model_training/Dockerfile \
             .
 
-      - name: Compare and push model-training image
+      - name: Push model-training image to Docker Hub
         run: |
-          REMOTE_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training 2>/dev/null \
-            || echo ""
-          )
-          LOCAL_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training 2>/dev/null \
-            || echo ""
-          )
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training
 
-          echo "Remote digest: $REMOTE_DIGEST"
-          echo "Local  digest: $LOCAL_DIGEST"
-
-          if [ -z "$REMOTE_DIGEST" ] || [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
-            echo "Push model-training image to Docker Hub"
-            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training
-          else
-            echo "model-training image unchanged, skipping push"
-          fi
-
-  # ============================================================================  
+  # ============================================================================
   # 6) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
-  # ============================================================================  
+  # ============================================================================
   model_validation:
-    name: Build and Push model_validation Image (disable DVC/MLflow pushes)
+    name: Build and Push model_validation Image
     runs-on: ubuntu-latest
     needs: model_training
 
@@ -389,32 +331,13 @@ jobs:
             -f dockerfiles/model_validation/Dockerfile \
             .
 
-      - name: Compare and push model-validation image
+      - name: Push model-validation image to Docker Hub
         run: |
-          REMOTE_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation 2>/dev/null \
-            || echo ""
-          )
-          LOCAL_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation 2>/dev/null \
-            || echo ""
-          )
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation
 
-          echo "Remote digest: $REMOTE_DIGEST"
-          echo "Local  digest: $LOCAL_DIGEST"
-
-          if [ -z "$REMOTE_DIGEST" ] || [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
-            echo "Push model-validation image to Docker Hub"
-            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation
-          else
-            echo "model-validation image unchanged, skipping push"
-          fi
-
-  # ============================================================================  
+  # ============================================================================
   # 7) Build and push auth_service Image under single repo
-  # ============================================================================  
+  # ============================================================================
   auth-service:
     name: Build and Push auth_service Image
     runs-on: ubuntu-latest
@@ -446,32 +369,13 @@ jobs:
             -f dockerfiles/auth_service/Dockerfile \
             .
 
-      - name: Compare and push auth-service image
+      - name: Push auth-service image to Docker Hub
         run: |
-          REMOTE_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service 2>/dev/null \
-            || echo ""
-          )
-          LOCAL_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service 2>/dev/null \
-            || echo ""
-          )
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service
 
-          echo "Remote digest: $REMOTE_DIGEST"
-          echo "Local  digest: $LOCAL_DIGEST"
-
-          if [ -z "$REMOTE_DIGEST" ] || [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
-            echo "Push auth-service image to Docker Hub"
-            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service
-          else
-            echo "auth-service image unchanged, skipping push"
-          fi
-
-  # ============================================================================  
+  # ============================================================================
   # 8) Build and push predict_service Image under single repo
-  # ============================================================================  
+  # ============================================================================
   predict-service:
     name: Build and Push predict_service Image
     runs-on: ubuntu-latest
@@ -505,32 +409,13 @@ jobs:
             -f dockerfiles/predict_service/Dockerfile \
             .
 
-      - name: Compare and push predict-service image
+      - name: Push predict-service image to Docker Hub
         run: |
-          REMOTE_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service 2>/dev/null \
-            || echo ""
-          )
-          LOCAL_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service 2>/dev/null \
-            || echo ""
-          )
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service
 
-          echo "Remote digest: $REMOTE_DIGEST"
-          echo "Local  digest: $LOCAL_DIGEST"
-
-          if [ -z "$REMOTE_DIGEST" ] || [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
-            echo "Push predict-service image to Docker Hub"
-            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service
-          else
-            echo "predict-service image unchanged, skipping push"
-          fi
-
-  # ============================================================================  
-  # 9) Build and push tests Image under single repo
-  # ============================================================================  
+  # ============================================================================
+  # 9) Build and push tests Image
+  # ============================================================================
   tests-service:
     name: Build and Push tests Image
     runs-on: ubuntu-latest
@@ -565,32 +450,13 @@ jobs:
             -f dockerfiles/tests/Dockerfile \
             .
 
-      - name: Compare and push tests image
+      - name: Push tests image to Docker Hub
         run: |
-          REMOTE_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests 2>/dev/null \
-            || echo ""
-          )
-          LOCAL_DIGEST=$(
-            docker inspect --format='{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}' \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests 2>/dev/null \
-            || echo ""
-          )
-
-          echo "Remote digest: $REMOTE_DIGEST"
-          echo "Local  digest: $LOCAL_DIGEST"
-
-          if [ -z "$REMOTE_DIGEST" ] || [ "$REMOTE_DIGEST" != "$LOCAL_DIGEST" ]; then
-            echo "Push tests image to Docker Hub"
-            docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests
-          else
-            echo "tests image unchanged, skipping push"
-          fi
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests
 
   #============================================================================
   #10) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
-  #   (no push, no run, no DVC/MLflow, just checking docker-compose build)
+  #   (no push, no run, no DVC/MLflow, just checking docker-compose build from the compose files and not the individual Dockerfiles anymore).
   #============================================================================
   tests:
     name: Build all Docker Compose services (no run, no DVC/MLflow)
