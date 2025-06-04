@@ -12,9 +12,9 @@ concurrency:
 # Trigger: push or PR to main, develop, dev_new-feature-githubactions
 on:
   push:
-    branches: [ main, develop, dev_new-feature-githubactions ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop, dev_new-feature-githubactions ]
+    branches: [ main, develop ]
 
 env:
   # Docker Hub namespace
