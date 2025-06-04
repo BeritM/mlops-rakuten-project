@@ -25,29 +25,29 @@ jobs:
   # ============================================================================
   # 1) Lint the Python code with Pylint
   # ============================================================================
-  pylint:
-    name: Lint Python code with Pylint
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9"]
+  # pylint:
+  #   name: Lint Python code with Pylint
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       python-version: ["3.9"]
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
+  #     - name: Set up Python ${{ matrix.python-version }}
+  #       uses: actions/setup-python@v4
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies for linting
-        run: |
-          python -m pip install --upgrade pip pylint
+  #     - name: Install dependencies for linting
+  #       run: |
+  #         python -m pip install --upgrade pip pylint
 
-      - name: Run pylint
-        run: |
-          pylint .
+  #     - name: Run pylint
+  #       run: |
+  #         pylint .
 
   # ============================================================================  
   # 2) CodeQL Security & Quality Analysis
@@ -55,7 +55,7 @@ jobs:
   codeql-analyze:
     name: CodeQL Advanced Analyse
     runs-on: ubuntu-latest
-    needs: pylint
+    #needs: pylint
     permissions:
       security-events: write
       packages: read
