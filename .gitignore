@@ -27,3 +27,9 @@ my_env
 /data/
 /models/
 /models
+
+logs/
+airflow-*.pid
+airflow-webserver.pid
+airflow.db
+airflow.cfg
