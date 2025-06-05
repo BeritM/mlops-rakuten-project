@@ -6,13 +6,14 @@ services:
     volumes:
       - .:/app
       - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume
     working_dir: /app
     environment:
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
-    command: ["dvc", "pull", "--force"]
-  
+    command: ["dvc", "pull", "shared_volume/data/raw", "shared_volume/data/processed", "shared_volume/data/feedback", "shared_volume/models", "--force"]
+
   preprocessing:
     build:
       context: "."
@@ -103,7 +104,7 @@ services:
       dockerfile: "dockerfiles/predict_service/Dockerfile"
     env_file:
       - .env
-    environment:
+    environment: # eventually insert completely into .env
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
       - GITHUB_TOKEN=${GITHUB_TOKEN}
@@ -112,14 +113,14 @@ services:
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
+      #- DATA_FEEDBACK_DIR=${DATA_FEEDBACK_DIR}
+      #- FEEDBACK_CSV_PATH=${FEEDBACK_CSV_PATH}
     ports:
       - "8002:8002"
     volumes:
       - .:/app
       - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
       - dvc-cache:/app/.dvc/cache
-      - ./shared_volume/data:/app/data
-      - ./shared_volume/models:/app/models
     working_dir: /app
     depends_on:
       auth_service:
