@@ -1,0 +1,16 @@
+# prometheus/prometheus.yml
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # 1) Pushgateway scrapen (drift_monitor pusht hier seine Metriken hin)
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: ['pushgateway:9091']
+
+  # 2) (Optional) Weitere Jobs, z.B. wenn du später direkt einen ML-Service scrapen willst
+  # - job_name: 'predict_service'
+  #   static_configs:
+  #     - targets: ['predict_service:8000']

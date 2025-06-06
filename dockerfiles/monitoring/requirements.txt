@@ -1,0 +1,7 @@
+pandas
+numpy
+scikit-learn
+joblib
+evidently==0.7.7
+prometheus_client
+dvc

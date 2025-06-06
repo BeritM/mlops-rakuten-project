@@ -1,0 +1,63 @@
+# ────────────────────────────────────────────────────────────────────────────
+# prometheus/docker-compose.yml
+# ────────────────────────────────────────────────────────────────────────────
+version: '3.7'
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1) Drift Monitor (Eigenes Image, basierend auf monitoring/Dockerfile)
+  # ──────────────────────────────────────────────────────────────────────────
+  drift_monitor:
+    build:
+      context: ..              # Einen Ordner höher, damit Dockerfile unter /monitoring gefunden wird
+      dockerfile: monitoring/Dockerfile
+    container_name: drift_monitor_service
+    restart: unless-stopped
+    volumes:
+      - ../shared_volume/data:/data           # hier liegen 'train/' und 'feedback/'
+      - ../logs:/reports                     # Reports/HMTL/JSON werden ins Host-Log-Verzeichnis geschrieben
+    depends_on:
+      - pushgateway
+    # Supervisor startet automatisch drift_monitor.py beim Container-Start
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2) Pushgateway (Prometheus Pushgateway)
+  # ──────────────────────────────────────────────────────────────────────────
+  pushgateway:
+    image: prom/pushgateway:1.4.0
+    container_name: pushgateway_service
+    ports:
+      - "9091:9091"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 3) Prometheus
+  # ──────────────────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.36.2
+    container_name: prometheus_service
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml   # Deine Konfig im gleichen Ordner
+    ports:
+      - "9090:9090"
+    depends_on:
+      - pushgateway
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 4) (Optional) Grafana
+  # ──────────────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:9.0.0
+    container_name: grafana_service
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=DeinPasswort123!
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  grafana_data:
