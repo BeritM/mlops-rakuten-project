@@ -1,5 +1,4 @@
 services:
-  # === BESTEHENDE SERVICES ===
   dvc-sync:
     build:
       context: "./dockerfiles/dvc"
@@ -143,7 +142,7 @@ services:
     command: >
       sh -c "pytest plugins/cd4ml/tests/test_predict_service.py -v -rA"
 
-  # === NEUE AIRFLOW SERVICES ===
+  # === NEW AIRFLOW SERVICES ===
   postgres:
     image: postgres:13
     environment:
@@ -175,7 +174,9 @@ services:
       - ./logs:/opt/airflow/logs
       - ./shared_volume:/opt/airflow/shared_volume
       - ./.env:/opt/airflow/.env
-      - /var/run/docker.sock:/var/run/docker.sock  # Wichtig für Docker-in-Docker
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro  
+      - ./:/opt/airflow/project:ro  
     ports:
       - "8080:8080"
     command: webserver
@@ -202,7 +203,9 @@ services:
       - ./logs:/opt/airflow/logs
       - ./shared_volume:/opt/airflow/shared_volume
       - ./.env:/opt/airflow/.env
-      - /var/run/docker.sock:/var/run/docker.sock  # Wichtig für Docker-in-Docker
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro 
+      - ./:/opt/airflow/project:ro  
     command: scheduler
     restart: always
 
