@@ -14,7 +14,7 @@ on:
   push:
     branches: [ main, develop, develop, dev_new-feature-githubactions ]
   pull_request:
-    branches: [ main, develop, develop, dev_new-feature-githubactions]
+    branches: [ main, develop, develop, dev_new-feature-githubactions ]
 
 env:
   # Docker Hub namespace
@@ -34,38 +34,38 @@ jobs:
   #     packages: read
   #     actions: read
   #     contents: read
-
+  #
   #   strategy:
   #     fail-fast: false
   #     matrix:
   #       include:
   #         - language: python
   #           build-mode: none
-
+  #
   #   steps:
   #     - name: Checkout repository
   #       uses: actions/checkout@v4
-
+  #
   #     - name: Initialize CodeQL
   #       uses: github/codeql-action/init@v3
   #       with:
   #         languages: ${{ matrix.language }}
   #         build-mode: ${{ matrix.build-mode }}
-
+  #
   #     - if: matrix.build-mode == 'manual'
   #       shell: bash
   #       run: |
   #         echo 'Du hast build-mode="manual" gewählt – hier die Kommandos zum Bauen einfügen'
   #         exit 1
-
+  #
   #     - name: Perform CodeQL Analysis
   #       uses: github/codeql-action/analyze@v3
   #       with:
   #         category: "/language:${{ matrix.language }}"
 
-  # ====================================================================
+  # ============================================================================
   # 2) Run Pytest Tests (ignoring test_predict_service.py)
-  # ====================================================================
+  # ============================================================================
   pytest-tests:
     name: Run pytest tests (ignoring test_predict_service.py)
     # Wenn du wieder „needs: codeql-analyze“ aktivieren möchtest, entferne hier das „#“
@@ -85,6 +85,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest
           pip install pandas numpy pyyaml nltk
+          # Download NLTK stopwords
+          python -c "import nltk; nltk.download('stopwords')"
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
           if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
@@ -100,9 +102,9 @@ jobs:
             --ignore=tests/test_predict_service.py \
             --ignore=plugins/cd4ml/tests/test_predict_service.py
 
-  # ====================================================================
+  # ============================================================================
   # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
-  # ====================================================================
+  # ============================================================================
   dvc-sync:
     name: Build and Push dvc-sync Image
     runs-on: ubuntu-latest
@@ -390,10 +392,10 @@ jobs:
         run: |
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests
 
-  #============================================================================
-  #10) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
-  #   (no push, no run, no DVC/MLflow, just checking docker-compose build from the compose files and not the individual Dockerfiles anymore).
-  #============================================================================
+  # ============================================================================
+  # 10) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
+  #     (no push, no run, no DVC/MLflow, just checking docker-compose build from the compose files and not the individual Dockerfiles anymore).
+  # ============================================================================
   tests:
     name: Build (no Push) Docker Compose files
     runs-on: ubuntu-latest
