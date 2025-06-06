@@ -1,15 +1,13 @@
 name: Pytest, Build & Push Single Docker Services, and Docker Compose Build
 
-# This workflow runs pylint on the Python code first, then pytest tests, builds and pushes Docker images for various services,
+# This workflow runs CodeQL, Pytest, builds and pushes Docker images for various services (via a matrix),
 # and checks Docker Compose build without running containers.
 # It is triggered on pushes or pull requests to the main, develop, or dev_new-feature-githubactions branches.
 
-# Avoids concurrency issues by grouping jobs under the same workflow and branch
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Trigger: push or PR to main, develop, dev_new-feature-githubactions
 on:
   push:
     branches: [ main, develop, dev_new-feature-githubactions ]
@@ -24,7 +22,6 @@ env:
 jobs:
   # ============================================================================
   # 1) CodeQL Security & Quality Analysis 
-  # This job analyzes the code for security vulnerabilities and quality issues like unused imports and variables etc.
   # ============================================================================
   codeql-analyze:
     name: CodeQL Advanced Analyse
@@ -68,11 +65,20 @@ jobs:
   # ============================================================================
   pytest-tests:
     name: Run pytest tests (ignoring test_predict_service.py)
-    # needs: codeql-analyze
+    needs: codeql-analyze
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/requirements-dev.txt', 'plugins/cd4ml/tests/requirements-dev.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -102,54 +108,52 @@ jobs:
             --ignore=plugins/cd4ml/tests/test_predict_service.py
 
   # ============================================================================
-  # 3) Build and push dvc-sync Image under single repo
+  # 3) Build & Push Services using a Matrix
+  #    Includes Docker layer caching
   # ============================================================================
-  dvc-sync:
-    name: Build and Push dvc-sync Image
-    runs-on: ubuntu-latest
+  build-and-push-services:
+    name: Build & Push Services
     needs:
       - pytest-tests
       - codeql-analyze
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Pull remote dvc-sync image if it exists
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync || true
-
-      - name: Build local dvc-sync image
-        run: |
-          docker build \
-            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync \
-            -f dockerfiles/dvc/Dockerfile \
-            .
-
-      - name: Push dvc-sync image to Docker Hub
-        run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync
-
-  # ============================================================================
-  # 4) Build and push preprocessing Image under single repo
-  # ============================================================================
-  preprocessing:
-    name: Build and Push preprocessing Image
     runs-on: ubuntu-latest
-    needs: dvc-sync
+
+    strategy:
+      matrix:
+        service:
+          - name: dvc-sync
+            dockerfile: dockerfiles/dvc/Dockerfile
+            tag: dvc-sync
+          - name: preprocessing
+            dockerfile: dockerfiles/preprocessing/Dockerfile
+            tag: preprocessing
+          - name: model-training
+            dockerfile: dockerfiles/model_training/Dockerfile
+            tag: model-training
+          - name: model-validation
+            dockerfile: dockerfiles/model_validation/Dockerfile
+            tag: model-validation
+          - name: auth-service
+            dockerfile: dockerfiles/auth_service/Dockerfile
+            tag: auth-service
+          - name: predict-service
+            dockerfile: dockerfiles/predict_service/Dockerfile
+            tag: predict-service
+          - name: tests
+            dockerfile: dockerfiles/tests/Dockerfile
+            tag: tests
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /home/runner/.docker/registry-v2
+          key: ${{ runner.os }}-docker-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -161,223 +165,30 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Pull remote preprocessing image if it exists
+      - name: Pull remote image (cache) for ${{ matrix.service.name }}
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing || true
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:${{ matrix.service.tag }} || true
 
-      - name: Build local preprocessing image
-        run: |
-          docker build \
-            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing \
-            -f dockerfiles/preprocessing/Dockerfile \
-            .
-
-      - name: Push preprocessing image to Docker Hub
-        run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing
-
-  # ============================================================================
-  # 5) Build and push model_training Image under single repo
-  # ============================================================================
-  model_training:
-    name: Build and Push model_training Image
-    runs-on: ubuntu-latest
-    needs: preprocessing
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Pull remote model-training image if it exists
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training || true
-
-      - name: Build local model-training image
+      - name: Build and Push ${{ matrix.service.name }} image
         run: |
           docker build \
-            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training \
-            -f dockerfiles/model_training/Dockerfile \
+            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:${{ matrix.service.tag }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:${{ matrix.service.tag }} \
+            -f ${{ matrix.service.dockerfile }} \
             .
-
-      - name: Push model-training image to Docker Hub
-        run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:${{ matrix.service.tag }}
 
   # ============================================================================
-  # 6) Build and push model_validation Image under single repo
-  # ============================================================================
-  model_validation:
-    name: Build and Push model_validation Image
-    runs-on: ubuntu-latest
-    needs: model_training
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Pull remote model-validation image if it exists
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation || true
-
-      - name: Build local model-validation image
-        run: |
-          docker build \
-            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation \
-            -f dockerfiles/model_validation/Dockerfile \
-            .
-
-      - name: Push model-validation image to Docker Hub
-        run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-validation
-
-  # ============================================================================
-  # 7) Build and push auth_service Image under single repo
-  # ============================================================================
-  auth-service:
-    name: Build and Push auth_service Image
-    runs-on: ubuntu-latest
-    needs: model_validation
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Pull remote auth-service image if it exists
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service || true
-
-      - name: Build local auth-service image
-        run: |
-          docker build \
-            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service \
-            -f dockerfiles/auth_service/Dockerfile \
-            .
-
-      - name: Push auth-service image to Docker Hub
-        run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:auth-service
-
-  # ============================================================================
-  # 8) Build and push predict_service Image under single repo
-  # ============================================================================
-  predict-service:
-    name: Build and Push predict_service Image
-    runs-on: ubuntu-latest
-    needs:
-      - auth-service
-      - model_validation
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Pull remote predict-service image if it exists
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service || true
-
-      - name: Build local predict-service image
-        run: |
-          docker build \
-            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service \
-            -f dockerfiles/predict_service/Dockerfile \
-            .
-
-      - name: Push predict-service image to Docker Hub
-        run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:predict-service
-
-  # ============================================================================
-  # 9) Build and push tests Image
-  # ============================================================================
-  tests-service:
-    name: Build and Push tests Image
-    runs-on: ubuntu-latest
-    needs:
-      - auth-service
-      - model_validation
-      - predict-service
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Pull remote tests image if it exists
-        run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests || true
-
-      - name: Build local tests image
-        run: |
-          docker build \
-            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests \
-            -f dockerfiles/tests/Dockerfile \
-            .
-
-      - name: Push tests image to Docker Hub
-        run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:tests
-
-  # ============================================================================
-  # 10) Final Job: Build all Docker Compose services from docker-compose.yml and docker-compose.inference.yml together 
-  #     (no push, no run, no DVC/MLflow, just checking docker-compose build from the compose files and not the individual Dockerfiles anymore).
+  # 4) Final Job: Build all Docker Compose services (no run)
   # ============================================================================
   tests:
     name: Build (no Push) Docker Compose files
     runs-on: ubuntu-latest
-    needs: tests-service
+    needs: build-and-push-services
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
