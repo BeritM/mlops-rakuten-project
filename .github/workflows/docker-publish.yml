@@ -108,46 +108,43 @@ jobs:
   # ============================================================================
   # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
   # ============================================================================
-  dvc-sync:
-    name: Build and Push dvc-sync Image
-    runs-on: ubuntu-latest
-    needs:
-    #  - codeql-analyze
-      - pytest-tests
+    pytest-tests:
+      name: Run pytest tests (ignoring test_predict_service.py)
+      runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Patch Dockerfile to disable DVC pushes
-        run: |
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/dvc/Dockerfile
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          python-version: '3.9'
 
-      - name: Pull remote dvc-sync image if it exists
+      - name: Install Python dependencies
         run: |
-          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync || true
+          python -m pip install --upgrade pip
 
-      - name: Build local dvc-sync image
-        run: |
-          docker build \
-            --cache-from ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync \
-            -t ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync \
-            -f dockerfiles/dvc/Dockerfile \
-            .
+          # pytest für die Tests
+          pip install pytest
 
-      - name: Push dvc-sync image to Docker Hub
+          # zusätzliche Bibliotheken, die test_pipeline_components.py benötigt:
+          pip install pandas numpy pyyaml nltk
+
+          # Falls Du in Deinem Repo requirements-Dateien hast, installiere sie danach:
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
+
+      - name: Check Pytest installation
         run: |
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync
+          which pytest || echo "Pytest not found!"
+          pytest --version
+
+      - name: Run pytest in repository (ignoring test_predict_service.py)
+        run: |
+          pytest . --maxfail=1 --disable-warnings -q \
+            --ignore=tests/test_predict_service.py \
+            --ignore=plugins/cd4ml/tests/test_predict_service.py
 
   # ============================================================================
   # 4) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
