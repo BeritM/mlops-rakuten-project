@@ -12,9 +12,9 @@ concurrency:
 # Trigger: push or PR to main, develop, dev_new-feature-githubactions
 on:
   push:
-    branches: [ main, develop, develop, dev_new-feature-githubactions ]
+    branches: [ main, develop, dev_new-feature-githubactions ]
   pull_request:
-    branches: [ main, develop, develop, dev_new-feature-githubactions ]
+    branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
   # Docker Hub namespace
@@ -34,30 +34,30 @@ jobs:
       packages: read
       actions: read
       contents: read
-  
+
     strategy:
       fail-fast: false
       matrix:
         include:
           - language: python
             build-mode: none
-  
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-  
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-  
+
       - if: matrix.build-mode == 'manual'
         shell: bash
         run: |
           echo 'Du hast build-mode="manual" gewählt – hier die Kommandos zum Bauen einfügen'
           exit 1
-  
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
@@ -102,7 +102,7 @@ jobs:
             --ignore=plugins/cd4ml/tests/test_predict_service.py
 
   # ============================================================================
-  # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
+  # 3) Build and push dvc-sync Image under single repo
   # ============================================================================
   dvc-sync:
     name: Build and Push dvc-sync Image
@@ -113,10 +113,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Patch Dockerfile to disable DVC pushes
-        run: |
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/dvc/Dockerfile
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -145,7 +141,7 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:dvc-sync
 
   # ============================================================================
-  # 4) Build and push preprocessing Image under single repo (disable DVC/MLflow pushes)
+  # 4) Build and push preprocessing Image under single repo
   # ============================================================================
   preprocessing:
     name: Build and Push preprocessing Image
@@ -153,13 +149,7 @@ jobs:
     needs: dvc-sync
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Patch Dockerfile to disable DVC/MLflow pushes
-        run: |
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/preprocessing/Dockerfile || true
-          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/preprocessing/Dockerfile || true
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -188,7 +178,7 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:preprocessing
 
   # ============================================================================
-  # 5) Build and push model_training Image under single repo (disable DVC/MLflow pushes)
+  # 5) Build and push model_training Image under single repo
   # ============================================================================
   model_training:
     name: Build and Push model_training Image
@@ -196,13 +186,7 @@ jobs:
     needs: preprocessing
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Patch Dockerfile to disable DVC/MLflow pushes
-        run: |
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_training/Dockerfile || true
-          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_training/Dockerfile || true
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -231,7 +215,7 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:model-training
 
   # ============================================================================
-  # 6) Build and push model_validation Image under single repo (disable DVC/MLflow pushes)
+  # 6) Build and push model_validation Image under single repo
   # ============================================================================
   model_validation:
     name: Build and Push model_validation Image
@@ -239,13 +223,7 @@ jobs:
     needs: model_training
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Patch Dockerfile to disable DVC/MLflow pushes
-        run: |
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
-          sed -i 's/^RUN .*mlflow artifacts upload.*/# &/g' dockerfiles/model_validation/Dockerfile || true
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -282,8 +260,7 @@ jobs:
     needs: model_validation
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -322,8 +299,7 @@ jobs:
       - model_validation
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -363,8 +339,7 @@ jobs:
       - predict-service
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -402,17 +377,7 @@ jobs:
     needs: tests-service
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Patch Dockerfiles used by docker-compose to disable DVC/MLflow and shared_volume copy
-        run: |
-          sed -i 's/^RUN .*dvc pull.*/# &/g' dockerfiles/tests/Dockerfile || true
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/tests/Dockerfile || true
-          sed -i 's/^RUN .*pytest.*/# &/g' dockerfiles/tests/Dockerfile || true
-          sed -i 's/^RUN .*dvc push.*/# &/g' dockerfiles/model_validation/Dockerfile || true
-          sed -i 's/^RUN cp -R shared_volume\/data/# &/g' dockerfiles/tests/Dockerfile || true
-          sed -i 's/^RUN cp -R shared_volume\/models/# &/g' dockerfiles/tests/Dockerfile || true
+      - uses: actions/checkout@v4
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
