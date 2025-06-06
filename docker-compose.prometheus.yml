@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
 
   drift_monitor:
@@ -9,8 +11,8 @@ services:
     networks:
       - drift-net
     volumes:
-      - ../shared_volume:/app/shared_volume    # DVC-Daten liegen unter /app/shared_volume
-      - ../logs:/app/drift_monitor             # Reports landen immer in /app/drift_monitor
+      - ../shared_volume:/app/shared_volume        # DVC-Daten liegen unter /app/shared_volume
+      - ../logs:/app/logs                          # Logs & Reports landen in /app/logs
     depends_on:
       - pushgateway
     environment:
