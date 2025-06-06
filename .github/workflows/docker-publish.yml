@@ -1,7 +1,7 @@
 name: Pytest, Build & Push Single Docker Services, and Docker Compose Build
 
 # This workflow runs CodeQL, Pytest, builds and pushes Docker images for various services (via a matrix),
-# and checks Docker Compose build without running containers.
+# and checks Docker Compose builds (via a matrix) without running containers.
 # It is triggered on pushes or pull requests to the main, develop, or dev_new-feature-githubactions branches.
 
 concurrency:
@@ -179,12 +179,20 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}:${{ matrix.service.tag }}
 
   # ============================================================================
-  # 4) Final Job: Build all Docker Compose services (no run)
+  # 4) Final Job: Build all Docker Compose services via Matrix (no Push, no Run)
   # ============================================================================
-  tests:
-    name: Build (no Push) Docker Compose files
+  compose-build:
+    name: Build Docker Compose services (Matrix)
     runs-on: ubuntu-latest
     needs: build-and-push-services
+
+    strategy:
+      matrix:
+        compose-file:
+          - file: docker-compose.yml
+            label: "Full Compose"
+          - file: docker-compose.inference.yml
+            label: "Inference-Only"
 
     steps:
       - name: Checkout repository
@@ -197,10 +205,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build all Docker Compose services (SKIP actual run)
+      - name: Build services from ${{ matrix.label }}
         run: |
-          docker compose build
-
-      - name: Build inference‐only Docker Compose services (SKIP actual run)
-        run: |
-          docker compose -f docker-compose.inference.yml build
+          docker compose -f ${{ matrix.compose-file }} build
