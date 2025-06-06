@@ -1,0 +1,36 @@
+name: ".env.example changed issue"
+
+on:
+  push:
+    branches:
+      - develop
+      - dev_new-feature-githubactions
+    paths:
+      - '.env.example'
+
+jobs:
+  create_issue:
+    name: "Erstelle Issue bei .env.example-Änderung"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Issue erstellen
+        uses: peter-evans/create-issue@v6
+        with:
+          title: '.env.example wurde geändert ({{ github.ref_name }})'
+          
+          body: |
+            **Attention** - The env-example file in `{{ github.ref_name }}` has been changed!
+
+            Please check the changes and update your local `.env` file accordingly.
+            ${{ github.server_url }}/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}
+
+            _This issue is autmated._
+          
+          labels: |
+            notification
+          
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
