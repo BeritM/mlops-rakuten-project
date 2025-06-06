@@ -26,42 +26,42 @@ jobs:
   # 1) CodeQL Security & Quality Analysis 
   # This job analyzes the code for security vulnerabilities and quality issues like unused imports and variables etc.
   # ============================================================================
-  # codeql-analyze:
-  #   name: CodeQL Advanced Analyse
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     security-events: write
-  #     packages: read
-  #     actions: read
-  #     contents: read
-  #
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       include:
-  #         - language: python
-  #           build-mode: none
-  #
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Initialize CodeQL
-  #       uses: github/codeql-action/init@v3
-  #       with:
-  #         languages: ${{ matrix.language }}
-  #         build-mode: ${{ matrix.build-mode }}
-  #
-  #     - if: matrix.build-mode == 'manual'
-  #       shell: bash
-  #       run: |
-  #         echo 'Du hast build-mode="manual" gewählt – hier die Kommandos zum Bauen einfügen'
-  #         exit 1
-  #
-  #     - name: Perform CodeQL Analysis
-  #       uses: github/codeql-action/analyze@v3
-  #       with:
-  #         category: "/language:${{ matrix.language }}"
+  codeql-analyze:
+    name: CodeQL Advanced Analyse
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+  
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+  
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+  
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+  
+      - if: matrix.build-mode == 'manual'
+        shell: bash
+        run: |
+          echo 'Du hast build-mode="manual" gewählt – hier die Kommandos zum Bauen einfügen'
+          exit 1
+  
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
 
   # ============================================================================
   # 2) Run Pytest Tests (ignoring test_predict_service.py)
@@ -109,6 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - pytest-tests
+      - codeql-analyze
 
     steps:
       - uses: actions/checkout@v4
