@@ -68,7 +68,6 @@ jobs:
   # ============================================================================
   pytest-tests:
     name: Run pytest tests (ignoring test_predict_service.py)
-    # Wenn du wieder „needs: codeql-analyze“ aktivieren möchtest, entferne hier das „#“
     # needs: codeql-analyze
     runs-on: ubuntu-latest
 
@@ -84,7 +83,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest
-          pip install pandas numpy pyyaml nltk
+          pip install pandas numpy pyyaml nltk mlflow
           # Download NLTK stopwords
           python -c "import nltk; nltk.download('stopwords')"
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
