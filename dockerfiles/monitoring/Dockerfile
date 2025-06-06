@@ -1,27 +1,31 @@
 FROM python:3.11-slim
 
-# 1) Arbeitsverzeichnis im Container
 WORKDIR /app
 
-# 2) System-Abhängigkeiten installieren: Supervisor, Git
+# 1) System-Paket-Installation: Supervisor und Git (für DVC-Pull)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       supervisor \
       git \
     && rm -rf /var/lib/apt/lists/*
 
-# 3) Kopiere requirements und installiere Python-Abhängigkeiten + DVC
-COPY requirements.txt /app/requirements.txt
+# 2) Python-Dependencies installieren
+#    (requirements.txt liegt im Ordner dockerfiles/monitoring/)
+COPY dockerfiles/monitoring/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt \
     && pip install --no-cache-dir dvc
 
-# 4) Kopiere den Drift-Monitor-Code ins Image
+# 3) Drift-Monitor-Code ins Image kopieren
+#    (drift_monitor/ befindet sich im Projekt-Root direkt neben dockerfiles/)
 COPY drift_monitor /app/drift_monitor
 
-# 5) Supervisor-Konfiguration
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# 6) Volumes definieren, exakt so, wie dein Skript die Pfade erwartet
-VOLUME ["/shared_volume/data/raw", "/shared_volume/data/feedback", "/shared_volume/data/processed"]
+# 4) Supervisor-Konfiguration ins Image kopieren
+#    (supervisord.conf liegt im Ordner dockerfiles/monitoring/)
+COPY dockerfiles/monitoring/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# 7) Supervisor im Vordergrund starten
+# 5) Declare volume-Points (gemountet später durch docker-compose)
+#    Hier reservieren wir /app/shared_volume (für DVC-Daten) und /app/drift_monitor (für Reports).
+VOLUME ["/app/shared_volume", "/app/drift_monitor"]
+
+# 6) Beim Container-Start Supervisor im Vordergrund starten
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
