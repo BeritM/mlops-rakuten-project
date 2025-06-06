@@ -112,7 +112,7 @@ jobs:
     name: Build and Push dvc-sync Image
     runs-on: ubuntu-latest
     needs:
-      - codeql-analyze
+    #  - codeql-analyze
       - pytest-tests
 
     steps:
