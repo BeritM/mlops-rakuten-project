@@ -68,43 +68,43 @@ jobs:
   # + without DVC pull, because we test only the python code itself, not the data or models, hence no DVC pull needed)
   # ============================================================================
   pytest-tests:
-  name: Run pytest tests (ignoring test_predict_service.py)
-  #needs: codeql-analyze
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
+    name: Run pytest tests (ignoring test_predict_service.py)
+    # needs: codeql-analyze
+    runs-on: ubuntu-latest
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        # pytest für die Tests
-        pip install pytest
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-        # zusätzliche Bibliotheken, die test_pipeline_components.py benötigt
-        pip install pandas numpy pyyaml
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
 
-        # Falls du in deinem Repo noch requirements-Dateien hast, installiere sie danach
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-        if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
+          # pytest für die Tests
+          pip install pytest
 
-    - name: Check Pytest installation
-      run: |
-        which pytest || echo "Pytest not found!"
-        pytest --version
+          # zusätzliche Bibliotheken, die test_pipeline_components.py benötigt
+          pip install pandas numpy pyyaml
 
-    - name: Run pytest in repository (ignoring test_predict_service.py)
-      run: |
-        pytest . --maxfail=1 --disable-warnings -q \
-          --ignore=tests/test_predict_service.py \
-          --ignore=plugins/cd4ml/tests/test_predict_service.py
+          # Falls Du in Deinem Repo noch requirements-Dateien hast, installiere sie danach
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
 
+      - name: Check Pytest installation
+        run: |
+          which pytest || echo "Pytest not found!"
+          pytest --version
 
+      - name: Run pytest in repository (ignoring test_predict_service.py)
+        run: |
+          pytest . --maxfail=1 --disable-warnings -q \
+            --ignore=tests/test_predict_service.py \
+            --ignore=plugins/cd4ml/tests/test_predict_service.py
   # ============================================================================
   # 3) Build and push dvc-sync Image under single repo (disable DVC pushes via sed)
   # ============================================================================
