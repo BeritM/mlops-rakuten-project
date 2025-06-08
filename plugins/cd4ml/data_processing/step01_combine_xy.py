@@ -20,6 +20,8 @@ def load_combined_data(x_path: str, y_path: str, save_path: str = None) -> pd.Da
     df_y = df_y.astype("str")
     
     df_combined = pd.concat([df_x, df_y], axis=1)
+    df_combined["productid"] = df_combined["productid"].astype("str")
+    df_combined["imageid"] = df_combined["imageid"].astype("str") 
     
     if save_path is not None:
         df_combined.to_csv(save_path, index=False)

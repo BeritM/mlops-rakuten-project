@@ -39,8 +39,11 @@ class ProductTypePredictorMLflow:
         return self.product_dictionary[int(prediction)]
 
     @staticmethod
-    def clean_text_static(text):
+    def clean_text_static(designation, description):
         """Only text cleaning, no vectorization"""
+        if pd.isna(description):
+            description = ""
+        text = f"{designation} {description}"
         if not isinstance(text, str):
             raise ValueError("text has to be a string.")
         # Remove special characters and lowercase the text

@@ -43,6 +43,7 @@ from pathlib import Path
 from dvc_push_manager import track_and_push_with_retry
 
 from step01_combine_xy import load_combined_data
+from step01b_combine_feedback_raw import combine_feedback_raw
 #from step02_text_cleaning import clean_text
 from step03_split_data import split_dataset
 from step04_tfidf_transform import apply_tfidf
@@ -55,6 +56,7 @@ from preprocessing_core import ProductTypePredictorMLflow # replaces step02_text
 RAW_DIR  = os.getenv("DATA_RAW_DIR")
 PROC_DIR = os.getenv("DATA_PROCESSED_DIR")
 MODEL_DIR = os.getenv("MODEL_DIR")
+FEEDBACK_DIR = os.getenv("DATA_FEEDBACK_DIR")
 X_RAW_PATH            = os.path.join(RAW_DIR,  os.getenv("X_RAW"))
 Y_RAW_PATH            = os.path.join(RAW_DIR,  os.getenv("Y_RAW"))
 X_Y_RAW_PATH          = os.path.join(RAW_DIR,  os.getenv("X_Y_RAW"))
@@ -65,6 +67,8 @@ TFIDF_VECTORIZER_PATH = os.path.join(MODEL_DIR, os.getenv("TFIDF_VECTORIZER"))
 Y_TRAIN_PATH          = os.path.join(PROC_DIR, os.getenv("Y_TRAIN"))
 Y_VALIDATE_PATH       = os.path.join(PROC_DIR, os.getenv("Y_VALIDATE"))
 Y_TEST_PATH           = os.path.join(PROC_DIR, os.getenv("Y_TEST"))
+FEEDBACK_PATH         = os.path.join(FEEDBACK_DIR, os.getenv("FEEDBACK_CSV"))
+RETRAIN_RAW_PATH      = os.path.join(RAW_DIR, os.getenv("RETRAIN_RAW"))
 
 def validate_environment():
     """Validate that all required environment variables are set."""
@@ -96,30 +100,33 @@ def main():
         print(f"Processed data directory: {PROC_DIR}")
         print(f"Model directory: {MODEL_DIR}")
 
-        # 1. Load and combine raw data
-        print("\n1. Loading and combining raw data...")
-        df = load_combined_data(
-            x_path=X_RAW_PATH,
-            y_path=Y_RAW_PATH,
-            save_path=X_Y_RAW_PATH
-        )
-        print(f"Combined dataset shape: {df.shape}")
-        print("First few rows:")
-        print(df.head())
+        # 1.a Load and combine raw data
+        if not os.path.exists(X_Y_RAW_PATH):
+            print(f"Combined raw data file not found at {X_Y_RAW_PATH}. Combining XY raw data...")
+            print("\n1. Loading and combining raw data...")
+            df = load_combined_data(
+                x_path=X_RAW_PATH,
+                y_path=Y_RAW_PATH,
+                save_path=X_Y_RAW_PATH
+            )
+            print(f"Combined dataset shape: {df.shape}")
+            print("First few rows:")
+            print(df.head())
+        else:
+            df = pd.read_csv(X_Y_RAW_PATH)
+            print(f"Loaded existing combined raw data from {X_Y_RAW_PATH} with shape: {df.shape}")
 
-    # --- OUTDATED CODE ---
-    # --- used for further code correction ---
-    # 2. Clean text using the 'description' column
-    #if "description" not in df.columns:
-    #    raise KeyError("description not found.")
-    #df["cleaned_text"] = df["description"].astype(str).apply(ProductTypePredictorMLflow.clean_text_static)
-    
+        # 1.b Combine with feedback data if available
+        df = combine_feedback_raw(FEEDBACK_PATH, df_raw=df, save_path=RETRAIN_RAW_PATH)
+        print(f"Combined dataset shape after feedback: {df.shape}")
+        print(df.info())
+
         # 2. Clean text
         print("\n2. Cleaning text data...")
-        if "description" not in df.columns:
-            raise KeyError("'description' column not found in dataset")
+        if "designation" not in df.columns:
+            raise KeyError("'designation' column not found in dataset")
         
-        df["cleaned_text"] = df["description"].astype(str).apply(ProductTypePredictorMLflow.clean_text_static)    # clean_text has to be replaced with ProductTypePredictorMLflow.clean_text_static
+        df["cleaned_text"] = df.apply(lambda row: ProductTypePredictorMLflow.clean_text_static(row["designation"], row["description"]), axis=1)   
         print(f"Text cleaning completed. Sample cleaned text: {df['cleaned_text'].iloc[0][:100]}...")
 
         # 3. Train/Validate/Test Split
