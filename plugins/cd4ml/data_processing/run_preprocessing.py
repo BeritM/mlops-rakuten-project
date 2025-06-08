@@ -114,6 +114,9 @@ def main():
             print(df.head())
         else:
             df = pd.read_csv(X_Y_RAW_PATH)
+            df["productid"] = df["productid"].astype("str")
+            df["imageid"] = df["imageid"].astype("str")
+            df["prdtypecode"] = df["prdtypecode"].astype("str")
             print(f"Loaded existing combined raw data from {X_Y_RAW_PATH} with shape: {df.shape}")
 
         # 1.b Combine with feedback data if available
@@ -128,6 +131,7 @@ def main():
         
         df["cleaned_text"] = df.apply(lambda row: ProductTypePredictorMLflow.clean_text_static(row["designation"], row["description"]), axis=1)   
         print(f"Text cleaning completed. Sample cleaned text: {df['cleaned_text'].iloc[0][:100]}...")
+        print(df.head())
 
         # 3. Train/Validate/Test Split
         print("\n3. Splitting dataset...")
