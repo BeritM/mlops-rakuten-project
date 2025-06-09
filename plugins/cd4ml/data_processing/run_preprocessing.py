@@ -57,18 +57,18 @@ RAW_DIR  = os.getenv("DATA_RAW_DIR")
 PROC_DIR = os.getenv("DATA_PROCESSED_DIR")
 MODEL_DIR = os.getenv("MODEL_DIR")
 FEEDBACK_DIR = os.getenv("DATA_FEEDBACK_DIR")
-X_RAW_PATH            = os.path.join(RAW_DIR,  os.getenv("X_RAW"))
-Y_RAW_PATH            = os.path.join(RAW_DIR,  os.getenv("Y_RAW"))
-X_Y_RAW_PATH          = os.path.join(RAW_DIR,  os.getenv("X_Y_RAW"))
-X_TRAIN_TFIDF_PATH    = os.path.join(PROC_DIR, os.getenv("X_TRAIN_TFIDF"))
-X_VALIDATE_TFIDF_PATH = os.path.join(PROC_DIR, os.getenv("X_VALIDATE_TFIDF"))
-X_TEST_TFIDF_PATH     = os.path.join(PROC_DIR, os.getenv("X_TEST_TFIDF"))
-TFIDF_VECTORIZER_PATH = os.path.join(MODEL_DIR, os.getenv("TFIDF_VECTORIZER"))
-Y_TRAIN_PATH          = os.path.join(PROC_DIR, os.getenv("Y_TRAIN"))
-Y_VALIDATE_PATH       = os.path.join(PROC_DIR, os.getenv("Y_VALIDATE"))
-Y_TEST_PATH           = os.path.join(PROC_DIR, os.getenv("Y_TEST"))
-FEEDBACK_PATH         = os.path.join(FEEDBACK_DIR, os.getenv("FEEDBACK_CSV"))
-RETRAIN_RAW_PATH      = os.path.join(RAW_DIR, os.getenv("RETRAIN_RAW"))
+X_RAW_PATH            = os.path.join(RAW_DIR,  os.getenv("X_RAW")) # type: ignore
+Y_RAW_PATH            = os.path.join(RAW_DIR,  os.getenv("Y_RAW")) # type: ignore
+X_Y_RAW_PATH          = os.path.join(RAW_DIR,  os.getenv("X_Y_RAW")) # type: ignore
+X_TRAIN_TFIDF_PATH    = os.path.join(PROC_DIR, os.getenv("X_TRAIN_TFIDF")) # type: ignore
+X_VALIDATE_TFIDF_PATH = os.path.join(PROC_DIR, os.getenv("X_VALIDATE_TFIDF")) # type: ignore
+X_TEST_TFIDF_PATH     = os.path.join(PROC_DIR, os.getenv("X_TEST_TFIDF")) # type: ignore
+TFIDF_VECTORIZER_PATH = os.path.join(MODEL_DIR, os.getenv("TFIDF_VECTORIZER")) # type: ignore
+Y_TRAIN_PATH          = os.path.join(PROC_DIR, os.getenv("Y_TRAIN")) # type: ignore
+Y_VALIDATE_PATH       = os.path.join(PROC_DIR, os.getenv("Y_VALIDATE")) # type: ignore
+Y_TEST_PATH           = os.path.join(PROC_DIR, os.getenv("Y_TEST")) # type: ignore
+FEEDBACK_PATH         = os.path.join(FEEDBACK_DIR, os.getenv("FEEDBACK_CSV")) # type: ignore
+RETRAIN_RAW_PATH      = os.path.join(RAW_DIR, os.getenv("RETRAIN_RAW")) # type: ignore
 
 def validate_environment():
     """Validate that all required environment variables are set."""
