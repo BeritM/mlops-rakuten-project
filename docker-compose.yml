@@ -5,6 +5,7 @@ services:
       dockerfile: "Dockerfile"
     volumes:
       - .:/app
+      - ./.git:/app/.git:ro  # Git repository explizit mounten (read-only)
       - dvc-cache:/app/.dvc/cache
       - ./shared_volume:/app/shared_volume
     working_dir: /app
@@ -28,6 +29,10 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      # Git credentials für DVC push
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
     depends_on:
       dvc-sync:
         condition: service_completed_successfully
@@ -48,6 +53,10 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      # Git credentials für DVC push
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
     depends_on:
       preprocessing:
         condition: service_completed_successfully
@@ -68,6 +77,10 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      # Git credentials für DVC push
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
     depends_on:
       model_training:
         condition: service_completed_successfully
@@ -142,7 +155,7 @@ services:
     command: >
       sh -c "pytest plugins/cd4ml/tests/test_predict_service.py -v -rA"
 
-  # === NEW AIRFLOW SERVICES ===
+ # === AIRFLOW SERVICES ===
   postgres:
     image: postgres:13
     environment:
@@ -164,19 +177,33 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__WARN_DEPLOYMENT_EXPOSURE: 'false'
+      # Docker-in-Docker Support - Windows compatibility
+      DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      # Git/DVC Credentials passthrough
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_REPO_OWNER: ${GITHUB_REPO_OWNER}
+      GITHUB_REPO_NAME: ${GITHUB_REPO_NAME}
+      DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
+      DAGSHUB_REPO_OWNER: ${DAGSHUB_REPO_OWNER}
+      DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./shared_volume:/opt/airflow/shared_volume
       - ./.env:/opt/airflow/.env
+      # Docker-in-Docker: Docker Socket mounten (Linux/Mac)
+      # Kommentieren Sie die nächste Zeile aus, wenn Sie Windows mit TCP verwenden
       - /var/run/docker.sock:/var/run/docker.sock
+      # Projekt-Root für docker-compose Zugriff
       - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro  
-      - ./:/opt/airflow/project:ro  
+      - ./:/opt/airflow/project
     ports:
       - "8080:8080"
     command: webserver
@@ -194,23 +221,39 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      # Docker-in-Docker Support - Windows compatibility
+      DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      # Git/DVC Credentials passthrough
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_REPO_OWNER: ${GITHUB_REPO_OWNER}
+      GITHUB_REPO_NAME: ${GITHUB_REPO_NAME}
+      DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
+      DAGSHUB_REPO_OWNER: ${DAGSHUB_REPO_OWNER}
+      DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./shared_volume:/opt/airflow/shared_volume
       - ./.env:/opt/airflow/.env
+      # Docker-in-Docker: Docker Socket mounten (Linux/Mac)
+      # Kommentieren Sie die nächste Zeile aus, wenn Sie Windows mit TCP verwenden
       - /var/run/docker.sock:/var/run/docker.sock
+      # Projekt-Root für docker-compose Zugriff
       - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro 
-      - ./:/opt/airflow/project:ro  
+      - ./:/opt/airflow/project
     command: scheduler
     restart: always
 
   airflow-init:
-    image: apache/airflow:2.8.0
+    build:
+      context: ./dockerfiles/airflow
+      dockerfile: Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
@@ -222,14 +265,14 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       _AIRFLOW_DB_MIGRATE: 'true'
       _AIRFLOW_WWW_USER_CREATE: 'true'
-      _AIRFLOW_WWW_USER_USERNAME: airflow
-      _AIRFLOW_WWW_USER_PASSWORD: airflow
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD}
       _PIP_ADDITIONAL_REQUIREMENTS: ''
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
     entrypoint: /bin/bash
-    command: -c "airflow db init && airflow users create --role Admin --username airflow --email airflow@airflow.com --firstname admin --lastname admin --password airflow"
+    command: -c "airflow db init && airflow users create --role Admin --username ${_AIRFLOW_WWW_USER_USERNAME} --email airflow@airflow.com --firstname admin --lastname admin --password ${_AIRFLOW_WWW_USER_PASSWORD}"
 
 volumes:
   dvc-cache:

@@ -7,19 +7,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
  && rm -rf /var/lib/apt/lists/*
 
+ # Git safe directory configuration
+RUN git config --global --add safe.directory /app && \
+    git config --global --add safe.directory '*'
+
 # Upgrade pip
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir dvc[s3]   #### Max ####
-
-# Install DVC CLI so that "dvc push" is available
-# RUN pip install --no-cache-dir "dvc[s3]"      # CHANGED <-- doppelt
+    && pip install --no-cache-dir dvc[s3] 
 
 # Copy requirements.txt
 COPY dockerfiles/preprocessing/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy all project files into the container
-# COPY . .
+COPY . .
 
 # Set PYTHONPATH for possibility to use other scripts
 ENV PYTHONPATH="${PYTHONPATH}:/app"

@@ -6,9 +6,14 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends git \
  && rm -rf /var/lib/apt/lists/*
 
+ # Git safe directory configuration
+RUN git config --global --add safe.directory /app && \
+    git config --global --add safe.directory '*'
+
+
 COPY dockerfiles/model_validation/requirements-model.txt ./requirements-model.txt
 RUN pip install --no-cache-dir -r requirements-model.txt
-RUN pip install --no-cache-dir "dvc[s3]"      # CHANGED
+RUN pip install --no-cache-dir "dvc[s3]"      #
 
 COPY . .
 #COPY plugins/cd4ml/model_validation /app/plugins/cd4ml/model_validation
