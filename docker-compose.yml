@@ -6,13 +6,14 @@ services:
     volumes:
       - .:/app
       - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume
     working_dir: /app
     environment:
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
-    command: ["dvc", "pull", "--force"]
-  
+    command: ["dvc", "pull", "shared_volume/data/raw", "shared_volume/data/processed", "shared_volume/data/feedback", "shared_volume/models", "--force"]
+
   preprocessing:
     build:
       context: "."
@@ -81,25 +82,6 @@ services:
         condition: service_completed_successfully
     command: >
       sh -c "python plugins/cd4ml/model_validation/run_model_validation.py"
-  
-  tests:
-    build:
-      context: .
-      dockerfile: dockerfiles/tests/Dockerfile
-    volumes:
-      - .:/app
-      - dvc-cache:/app/.dvc/cache
-      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
-    working_dir: /app
-    env_file:
-      - .env
-    depends_on:
-      model_validation:
-        condition: service_completed_successfully
-      dvc-sync:
-        condition: service_completed_successfully
-    command: >
-      sh -c "dvc pull --force && pytest plugins/cd4ml/tests/test_predict_service.py -v -rA && dvc push"
 
   auth_service:
     build:
@@ -122,14 +104,23 @@ services:
       dockerfile: "dockerfiles/predict_service/Dockerfile"
     env_file:
       - .env
+    environment: # eventually insert completely into .env
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
+      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
+      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
+      - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
+      - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
+      #- DATA_FEEDBACK_DIR=${DATA_FEEDBACK_DIR}
+      #- FEEDBACK_CSV_PATH=${FEEDBACK_CSV_PATH}
     ports:
       - "8002:8002"
     volumes:
       - .:/app
       - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
       - dvc-cache:/app/.dvc/cache
-      - ./shared_volume/data:/app/data
-      - ./shared_volume/models:/app/models
     working_dir: /app
     depends_on:
       auth_service:
@@ -137,7 +128,36 @@ services:
       dvc-sync:
         condition: service_completed_successfully
     command: ["uvicorn", "plugins.cd4ml.inference.predict_service:predict_app", "--host", "0.0.0.0", "--port", "8002"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8002/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
   
-
+  tests:
+    build:
+      context: .
+      dockerfile: dockerfiles/tests/Dockerfile
+    volumes:
+      - .:/app
+      - dvc-cache:/app/.dvc/cache
+      - ./shared_volume:/app/shared_volume
+    working_dir: /app
+    env_file:
+      - .env
+    depends_on:
+      model_validation:
+        condition: service_completed_successfully
+      dvc-sync:
+        condition: service_completed_successfully
+      auth_service:
+        condition: service_healthy
+      predict_service:
+        condition: service_healthy
+    networks:
+      - default
+    command: >
+      sh -c "pytest plugins/cd4ml/tests/test_predict_service.py -v -rA"
+      
 volumes:
   dvc-cache:

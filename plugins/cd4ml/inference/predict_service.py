@@ -5,12 +5,21 @@ import joblib
 import mlflow
 from datetime import datetime
 from typing import Optional
+from dvc_push_manager import track_and_push_with_retry
+import threading
 
 from fastapi import FastAPI, Depends, HTTPException, status, Header
 from pydantic import BaseModel
 from jose import jwt, JWTError
 from mlflow.tracking import MlflowClient
 from plugins.cd4ml.data_processing.preprocessing_core import ProductTypePredictorMLflow
+from plugins.cd4ml.inference.utils import generate_id
+from filelock import FileLock
+from collections import defaultdict
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 # --- FastAPI App ---
 predict_app = FastAPI()
@@ -28,6 +37,10 @@ model_metrics = {}
 label_to_code = {}
 valid_labels = set()
 
+# Global in-memory store to track last prediction per user
+user_last_prediction = defaultdict(dict)
+CSV_LOCK_PATH = None  # Will be initialized in startup()
+
 # --- Auth Helper ---
 def verify_token(token: str = Header(...)):
     try:
@@ -39,6 +52,20 @@ def verify_token(token: str = Header(...)):
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
+# --- DVC Push Helper ---
+def _async_track_and_push(description: str) -> None:
+    def _worker():
+        try:
+            ok = track_and_push_with_retry(description=description, max_retries=3)
+            if ok:
+                print("[INFO] DVC/Git push succeeded.")
+            else:
+                print("[WARNING] DVC/Git push completed with warnings.")
+        except Exception as e:
+            print(f"[ERROR] DVC/Git push failed: {e}")
+
+    threading.Thread(target=_worker, daemon=True).start()
+
 # --- Pydantic Models ---
 class PredictionRequest(BaseModel):
     designation: str
@@ -47,34 +74,33 @@ class PredictionRequest(BaseModel):
 class PredictionResponse(BaseModel):
     predicted_class: str
 
-class FeedbackEntry(BaseModel):
-    designation: str
-    description: Optional[str] = None
-    predicted_label: str
+class FeedbackInput(BaseModel):
     correct_label: str
 
 # --- Startup Hook ---
 @predict_app.on_event("startup")
 def startup():
-    #global predictor, prod_model_version, model_params, model_metrics, label_to_code, valid_labels
-    global FEEDBACK_CSV_PATH, predictor, prod_model_version, model_params, model_metrics, label_to_code, valid_labels
+    global FEEDBACK_CSV_PATH, predictor, prod_model_version
+    global model_params, model_metrics, label_to_code, valid_labels, CSV_LOCK_PATH
 
-    # Load env variables
+    # Load environment variables
     feedback_dir = os.getenv("DATA_FEEDBACK_DIR")
-    feedback_filename = os.getenv("FEEDBACK_CSV_PATH")
+    feedback_filename = os.getenv("FEEDBACK_CSV")
     dagshub_user = os.getenv("DAGSHUB_USER_NAME")
     dagshub_token = os.getenv("DAGSHUB_USER_TOKEN")
     repo_owner = os.getenv("DAGSHUB_REPO_OWNER")
     repo_name = os.getenv("DAGSHUB_REPO_NAME")
 
-    # Setup feedback path
+    # Setup feedback path and file lock path
     if feedback_dir and feedback_filename:
         pathlib.Path(feedback_dir).mkdir(parents=True, exist_ok=True)
         FEEDBACK_CSV_PATH = os.path.join(feedback_dir, feedback_filename)
+        CSV_LOCK_PATH = FEEDBACK_CSV_PATH + ".lock"
         print(f"[INFO] Feedback CSV path: {FEEDBACK_CSV_PATH}")
     else:
         print("[WARNING] Feedback vars not set. Feedback functionality disabled.")
         FEEDBACK_CSV_PATH = None
+        CSV_LOCK_PATH = None
 
     # Setup MLflow
     model_name = "SGDClassifier_Model"
@@ -132,6 +158,10 @@ def startup():
 
 # --- Endpoints ---
 
+@predict_app.get("/health")
+def health_check():
+    return {"status": "healthy", "service": "predict_service"}
+
 @predict_app.get("/model-info")
 def get_model_info(user=Depends(verify_token)):
     return {
@@ -149,44 +179,79 @@ def get_model_info(user=Depends(verify_token)):
 
 @predict_app.post("/predict", response_model=PredictionResponse)
 def predict_product_type(request: PredictionRequest, user=Depends(verify_token)):
-    description_for_prediction = request.description if request.description is not None else ""
-    prediction = predictor.predict(request.designation, description_for_prediction)
-    return {"predicted_class": prediction}
+    username = user.get("sub")
+    prediction = predictor.predict(request.designation, request.description)
+    predicted_code = label_to_code.get(prediction, "UNKNOWN")
 
-@predict_app.post("/feedback")
-def submit_feedback(entry: FeedbackEntry, user=Depends(verify_token)):
-    print(f"DEBUG: FEEDBACK_CSV_PATH aktuell: {FEEDBACK_CSV_PATH}")
-    print(f"DEBUG: Typ von FEEDBACK_CSV_PATH: {type(FEEDBACK_CSV_PATH)}")
-    if FEEDBACK_CSV_PATH is None:
-        raise HTTPException(status_code=503, detail="Feedback is not enabled.")
+    # Create unique session_id for tracking this prediction
+    session_id = f"{username}_{datetime.now().timestamp()}"
 
-    if entry.correct_label not in valid_labels or entry.predicted_label not in valid_labels:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid product label. Check valid categories."
-        )
-
-    predicted_code = label_to_code[entry.predicted_label]
-    correct_code = label_to_code[entry.correct_label]
-    is_correct = predicted_code == correct_code
-
-    feedback_data = {
+    prediction_entry = {
         "timestamp": datetime.now().isoformat(),
+        "session_id": session_id,
         "model_version": prod_model_version.version,
-        "designation": entry.designation,
-        "description": entry.description,
+        "designation": request.designation,
+        "description": request.description,
+        "productid": generate_id(10),
+        "imageid": generate_id(12),
         "predicted_code": predicted_code,
-        "predicted_label": entry.predicted_label,
-        "correct_code": correct_code,
-        "correct_label": entry.correct_label,
-        "is_correct": is_correct
+        "predicted_label": prediction
     }
 
+    # Track session in memory
+    user_last_prediction[username] = {"id": session_id}
+
+    # Ensure safe write with file lock
     file_exists = pathlib.Path(FEEDBACK_CSV_PATH).is_file()
-    with open(FEEDBACK_CSV_PATH, mode="a", newline="", encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=feedback_data.keys())
-        if not file_exists:
+    with FileLock(CSV_LOCK_PATH):
+        with open(FEEDBACK_CSV_PATH, mode="a", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=prediction_entry.keys())
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(prediction_entry)
+
+    return {"predicted_class": prediction}
+
+
+@predict_app.post("/feedback")
+def submit_feedback(input: FeedbackInput, user=Depends(verify_token)):
+    correct_label = input.correct_label
+    username = user.get("sub")
+
+    if correct_label not in valid_labels:
+        raise HTTPException(status_code=400, detail="Invalid correct_label provided.")
+
+    # Check session-based tracking
+    session_id = user_last_prediction.get(username, {}).get("id")
+    if not session_id:
+        raise HTTPException(status_code=403, detail="No prediction found for current session.")
+
+    correct_code = label_to_code[correct_label]
+    is_correct = False
+
+    # Read, find, and update only the matching session_id row
+    with FileLock(CSV_LOCK_PATH):
+        with open(FEEDBACK_CSV_PATH, mode="r", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+
+        updated = False
+        for row in rows:
+            if row.get("session_id") == session_id:
+                row["correct_code"] = correct_code
+                row["correct_label"] = correct_label
+                row["is_correct"] = str(row["predicted_label"] == correct_label)
+                updated = True
+                break
+
+        if not updated:
+            raise HTTPException(status_code=404, detail="Session entry not found in CSV.")
+
+        # Overwrite file safely
+        with open(FEEDBACK_CSV_PATH, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=rows[0].keys())
             writer.writeheader()
-        writer.writerow(feedback_data)
+            writer.writerows(rows)
+
+    _async_track_and_push(description="append feedback correction")
 
     return {"status": "success", "message": "Feedback recorded."}
