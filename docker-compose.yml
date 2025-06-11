@@ -193,6 +193,7 @@ services:
       DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
       DAGSHUB_REPO_OWNER: ${DAGSHUB_REPO_OWNER}
       DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
+      HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
@@ -236,6 +237,7 @@ services:
       DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
       DAGSHUB_REPO_OWNER: ${DAGSHUB_REPO_OWNER}
       DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
+      HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
