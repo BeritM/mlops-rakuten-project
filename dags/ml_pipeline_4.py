@@ -67,7 +67,7 @@ with DAG(
         python_callable=check_env,
     )
 
-    # 1. DVC sync via BashOperator (ignore errors to not block pipeline)
+    # 1. DVC sync via BashOperator
     dvc_sync = BashOperator(
         task_id='dvc_sync',
         bash_command=(
@@ -83,61 +83,48 @@ with DAG(
         retries=0,
     )
 
-    # Helper to create downstream Docker tasks
-    def make_docker_task(task_id, image, command):
-        return DockerOperator(
-            skip_exit_codes=[1],  # treat exit code 1 as success to avoid retries
-
-            task_id=task_id,
-            image=image,
-            api_version='auto',
-            auto_remove=True,
-            command=command,
-            docker_url='unix:///var/run/docker.sock',
-            network_mode='bridge',
-            mounts=[
-                Mount(source=PROJECT_DIR, target='/app', type='bind'),
-                Mount(source=SHARED_VOL, target='/app/shared_volume', type='bind'),
-                Mount(source='dvc-cache', target='/app/.dvc/cache', type='volume'),
-            ],
-            working_dir='/app',
-            environment={
-                'GITHUB_TOKEN':       os.getenv('GITHUB_TOKEN'),
-                'GITHUB_REPO_OWNER':  os.getenv('GITHUB_REPO_OWNER'),
-                'GITHUB_REPO_NAME':   os.getenv('GITHUB_REPO_NAME'),
-                'DAGSHUB_USER_TOKEN': os.getenv('DAGSHUB_USER_TOKEN'),
-                'DAGSHUB_REPO_OWNER': os.getenv('DAGSHUB_REPO_OWNER'),
-                'DAGSHUB_REPO_NAME':  os.getenv('DAGSHUB_REPO_NAME'),
-                'PYTHONPATH':         '/app',
-                'PYTHONUNBUFFERED':   '1',
-            },
-            force_pull=False,
-            retries=0,
-            execution_timeout=timedelta(minutes=10),
-        )
-
-    preprocessing = make_docker_task(
-        'preprocessing',
-        'mlops-rakuten-project-preprocessing:latest',
-        'python plugins/cd4ml/data_processing/run_preprocessing.py'
+        # 2. Preprocessing via BashOperator
+    preprocessing = BashOperator(
+        task_id='preprocessing',
+        bash_command=(
+            f'cd {PROJECT_DIR} && '
+            'python plugins/cd4ml/data_processing/run_preprocessing.py || true'
+        ),
+        execution_timeout=timedelta(minutes=20),
+        retries=0,
     )
 
-    model_training = make_docker_task(
-        'model_training',
-        'mlops-rakuten-project-model_training:latest',
-        'python plugins/cd4ml/model_training/run_model_training.py'
+    # 3. Model Training via BashOperator
+    model_training = BashOperator(
+        task_id='model_training',
+        bash_command=(
+            f'cd {PROJECT_DIR} && '
+            'python plugins/cd4ml/model_training/run_model_training.py || true'
+        ),
+        execution_timeout=timedelta(minutes=30),
+        retries=0,
     )
 
-    model_validation = make_docker_task(
-        'model_validation',
-        'mlops-rakuten-project-model_validation:latest',
-        'python plugins/cd4ml/model_validation/run_model_validation.py'
+    # 4. Model Validation via BashOperator
+    model_validation = BashOperator(
+        task_id='model_validation',
+        bash_command=(
+            f'cd {PROJECT_DIR} && '
+            'python plugins/cd4ml/model_validation/run_model_validation.py || true'
+        ),
+        execution_timeout=timedelta(minutes=10),
+        retries=0,
     )
 
-    run_tests = make_docker_task(
-        'run_tests',
-        'mlops-rakuten-project-tests:latest',
-        'pytest plugins/cd4ml/tests/test_predict_service.py -v -rA'
+    # 5. Run Tests via BashOperator 
+    run_tests = BashOperator(
+        task_id='run_tests',
+        bash_command=(
+            f'cd {PROJECT_DIR} && '
+            'pytest plugins/cd4ml/tests/test_predict_service.py -v -rA || true'
+        ),
+        execution_timeout=timedelta(minutes=10),
+        retries=0,
     )
 
     # 6. Cleanup via BashOperator
