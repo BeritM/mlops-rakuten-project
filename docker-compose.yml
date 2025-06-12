@@ -29,6 +29,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - HOST_PROJECT_PATH=${HOST_PROJECT_PATH}
       # Git credentials für DVC push
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
@@ -184,6 +185,7 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__WARN_DEPLOYMENT_EXPOSURE: 'false'
+      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG # DEBUG Level für Airflow Logs to enable detailed logging
       # Docker-in-Docker Support - Windows compatibility
       DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
       # Git/DVC Credentials passthrough
@@ -195,12 +197,14 @@ services:
       DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
       HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
     volumes:
+      ###############  
+      - dvc-cache:/opt/airflow/project/.dvc/cache  # DVC Cache für Airflow, damit Airflow auf DVC-Daten zugreifen kann  
+      ###############  
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./shared_volume:/opt/airflow/shared_volume
       - ./.env:/opt/airflow/.env
       # Docker-in-Docker: Docker Socket mounten (Linux/Mac)
-      # Kommentieren Sie die nächste Zeile aus, wenn Sie Windows mit TCP verwenden
       - /var/run/docker.sock:/var/run/docker.sock
       # Projekt-Root für docker-compose Zugriff
       - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro  
@@ -239,12 +243,14 @@ services:
       DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
       HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
     volumes:
+      ###############  
+      - dvc-cache:/opt/airflow/project/.dvc/cache  # DVC Cache für Airflow um DVC-Pipelines zu unterstützen  
+      ###############  
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./shared_volume:/opt/airflow/shared_volume
       - ./.env:/opt/airflow/.env
       # Docker-in-Docker: Docker Socket mounten (Linux/Mac)
-      # Kommentieren Sie die nächste Zeile aus, wenn Sie Windows mit TCP verwenden
       - /var/run/docker.sock:/var/run/docker.sock
       # Projekt-Root für docker-compose Zugriff
       - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro 
