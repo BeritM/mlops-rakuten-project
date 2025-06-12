@@ -65,10 +65,14 @@ with DAG(
         import os, subprocess, logging
         log = logging.getLogger(__name__)
         os.chdir(PROJECT_DIR)
-        cmd = ['dvc', 'pull', '--force', '--verbose']
-        env = os.environ.copy()
-        # ensure credentials are in env
-        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        cmd = [
+        'dvc', 'pull',
+        'shared_volume/data/raw',
+        'shared_volume/data/processed',
+        'shared_volume/data/feedback',
+        '--force','--verbose',
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, env=os.environ)
         log.info(result.stdout)
         if result.returncode != 0:
             log.error(result.stderr)
@@ -110,25 +114,25 @@ with DAG(
 
     preprocessing = make_docker_task(
         'preprocessing',
-        'preprocessing:latest',
+        'mlops-rakuten-project-preprocessing:latest',
         'python plugins/cd4ml/data_processing/run_preprocessing.py'
     )
 
     model_training = make_docker_task(
         'model_training',
-        'model_training:latest',
+        'mlops-rakuten-project-model_training:latest',
         'python plugins/cd4ml/model_training/run_model_training.py'
     )
 
     model_validation = make_docker_task(
         'model_validation',
-        'model_validation:latest',
+        'mlops-rakuten-project-model_validation:latest',
         'python plugins/cd4ml/model_validation/run_model_validation.py'
     )
 
     run_tests = make_docker_task(
         'run_tests',
-        'tests:latest',
+        'mlops-rakuten-project-tests:latest',
         'pytest plugins/cd4ml/tests/test_predict_service.py -v -rA'
     )
 
