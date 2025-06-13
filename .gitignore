@@ -27,3 +27,10 @@ my_env
 /data/
 /models/
 /models
+
+# airflow
+logs/
+airflow-*.pid
+airflow-webserver.pid
+airflow.db
+airflow.cfg
