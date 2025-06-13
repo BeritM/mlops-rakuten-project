@@ -1,0 +1,11 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: 'retrain-webhook'
+
+receivers:
+  - name: 'retrain-webhook'
+    webhook_configs:
+      - url: 'http://dvc-sync:8000/trigger-training'
+        send_resolved: true
