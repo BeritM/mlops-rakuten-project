@@ -70,11 +70,9 @@ with DAG(
         log = logging.getLogger(__name__)
         os.chdir(PROJECT_DIR_DVC)
         cmd = [
-        'dvc', 'pull',
-        'shared_volume/data/raw',
-        'shared_volume/data/processed',
-        'shared_volume/data/feedback',
-        '--force','--verbose',
+        'dvc', 'pull', 
+        '--force',
+        '--verbose',
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, env=os.environ)
         log.info(result.stdout)
