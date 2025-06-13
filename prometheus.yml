@@ -2,7 +2,6 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-# Alertmanager configuration
 alerting:
   alertmanagers:
     - static_configs:
@@ -13,23 +12,22 @@ rule_files:
   - '/etc/prometheus/alert_rules.yml'
 
 scrape_configs:
-  # Prometheus scrapes the Pushgateway
   - job_name: 'pushgateway'
     honor_labels: true
+    metrics_path: /metrics
     static_configs:
       - targets:
           - 'pushgateway:9091'
 
-  # Scrape the drift_monitor exporter
   - job_name: 'drift_metrics'
     metrics_path: /metrics
     static_configs:
       - targets:
-          - 'drift_monitor:8003'
+          - 'drift_monitor_service:8003'
 
-  # Optional: scrape self metrics (Prometheus internal)
   - job_name: 'prometheus'
     scrape_interval: 5s
+    metrics_path: /metrics
     static_configs:
       - targets:
           - 'localhost:9090'
