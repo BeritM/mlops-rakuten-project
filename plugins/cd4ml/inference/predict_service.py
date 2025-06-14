@@ -17,6 +17,7 @@ from plugins.cd4ml.inference.utils import generate_id
 from filelock import FileLock
 from collections import defaultdict
 from dotenv import load_dotenv
+import subprocess
 
 load_dotenv()
 
@@ -255,3 +256,17 @@ def submit_feedback(input: FeedbackInput, user=Depends(verify_token)):
     _async_track_and_push(description="append feedback correction")
 
     return {"status": "success", "message": "Feedback recorded."}
+
+#@predict_app.post("/start-retraining")
+#def start_retraining(user=Depends(verify_token)):
+#    username = user.get("sub")
+#    if not username or username != "admin":
+#        raise HTTPException(status_code=401, detail="Unauthorized user")
+#    try:
+#        result = subprocess.run([
+#            "docker-compose", "up", "--build", "--detach",
+#            "dvc-sync", "preprocessing", "model_training", "model_validation"
+#            ], capture_output=True, text=True, check=True)
+#        return {"status": "success", "output": result.stdout}
+#    except subprocess.CalledProcessError as e:
+#        return {"status": "error", "error": e.stderr}

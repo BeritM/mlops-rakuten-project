@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import json
 import time
+import subprocess
 
 # --- Configuration ---
 # IMPORTANT: Ensure these URLs match where your FastAPI services are running.
@@ -385,11 +386,21 @@ else:
             if delete_user_button:
                 delete_user(user_to_delete)
 
-        st.subheader("Model Information")
+        st.header("Model Management")
+        #st.subheader("Model Information")
         if st.button("Fetch Model Info"):
             model_info = get_model_info()
             if model_info:
                 st.json(model_info) # Display model info in a nice JSON format
+
+        #st.subheader("Start retraining the model")
+        if st.button("Retrain Model"):
+            try:
+                subprocess.run(["docker", "compose", "up", "dvc-sync", "preprocessing", "model_training", "model_validation"], check=True)
+                st.success("Retraining was successful. Check logs for details.")
+            except subprocess.CalledProcessError as e:
+                st.error(f"Failed to start retraining: {e}")
+
 
 
     # --- Prediction Section (for all logged-in users) ---
@@ -419,8 +430,7 @@ else:
     if st.session_state.show_prediction_message and st.session_state.last_prediction:
         st.markdown("---")
 
-        #options_for_dropdown = dropdown_options = prepare_dropdown_options(product_dict, st.session_state.last_prediction)
-        #options_for_dropdown.insert(0, SELECT_TEXT)
+     
         dynamic_dropdown_options = []
 
         if not st.session_state.show_all_categories:
@@ -448,12 +458,6 @@ else:
         
     
     message_placeholder = st.empty()
-    #if 'show_upload_message' in st.session_state and st.session_state.show_upload_message:    
-    #    if st.session_state.get('confirmed_category'):
-    #        message_placeholder.success(f"Article uploaded in category **'{st.session_state.confirmed_category}'**")
-    #        time.sleep(3)
-    #        message_placeholder.empty()
-    #        st.session_state.show_upload_message = False
 
     if st.session_state.get('show_upload_message') and st.session_state.upload_status_message:
         if st.session_state.upload_status_type == "success":
