@@ -14,6 +14,14 @@ services:
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
     command: ["dvc", "pull", "shared_volume/data/raw", "shared_volume/data/processed", "shared_volume/data/feedback", "shared_volume/models", "--force"]
+    #command: >
+    #  bash -c "
+    #  dvc config cache.protected false &&
+    #  dvc pull shared_volume/data/raw --force &&
+    #  dvc pull shared_volume/data/processed --force &&
+    #  dvc pull shared_volume/data/feedback --force &&
+    #  dvc pull shared_volume/models --force
+    #  "
 
   preprocessing:
     build:

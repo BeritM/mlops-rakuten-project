@@ -1,12 +1,42 @@
 import streamlit as st
 import requests
 import json
+import time
+import subprocess
 
 # --- Configuration ---
 # IMPORTANT: Ensure these URLs match where your FastAPI services are running.
 AUTH_API_BASE_URL = "http://localhost:8001"
 PREDICT_API_BASE_URL = "http://localhost:8002" # Updated to 8002 as per error message
 
+product_dict = {10: 'Used Books', 
+                1940: 'Food', 
+                40: 'Used video games', 
+                2060: 'Crafts & souvenirs', 
+                50: 'Console games accessories', 
+                2220: 'Pet accessories', 
+                60: 'New console games', 
+                2280: 'Magazines & Comics', 
+                1140: 'Action figurines', 
+                2403: 'Books, magazines & collections', 
+                1160: 'Trading card games', 
+                2462: 'Used video games & accessories', 
+                1180: 'Role-playing games', 
+                2522: 'Office Supplies', 
+                1280: 'Childrens toys', 
+                2582: 'Gardening Furniture', 
+                1281: 'Board games', 
+                2583: 'Pool & accessories', 
+                1300: 'Miniature car toys', 
+                2585: 'Gardening tools', 
+                1301: 'Indoor games', 
+                2705: 'New books', 
+                1302: 'Outdoor play', 
+                2905: 'Computer games', 
+                1320: 'Baby care', 
+                2910: 'Household linens', 
+                1560: 'Furniture', 
+                1920: 'Home accessories'}
 # --- Session State Initialization ---
 # Initialize session state variables if they don't already exist.
 # This helps maintain state across Streamlit re-runs.
@@ -18,8 +48,36 @@ if 'username' not in st.session_state:
     st.session_state.username = None
 if 'user_role' not in st.session_state:
     st.session_state.user_role = None
+# For prediction form
+if 'designation_input' not in st.session_state:
+    st.session_state.designation_input = ""
+if 'description_input' not in st.session_state:
+    st.session_state.description_input = ""
+if 'last_prediction' not in st.session_state:
+    st.session_state.last_prediction = None
+if 'warning' not in st.session_state:
+    st.session_state.warning = None
+if 'show_prediction_message' not in st.session_state:
+    st.session_state.show_prediction_message = False
+if "show_upload_message" not in st.session_state:
+    st.session_state.show_upload_message = False
+if 'upload_status_message' not in st.session_state: 
+    st.session_state.upload_status_message = None
+if 'upload_status_type' not in st.session_state: 
+    st.session_state.upload_status_type = None
+if 'selected_category_from_dropdown_index' not in st.session_state: # To control selectbox index
+    st.session_state.selected_category_from_dropdown_index = 0
+if 'confirmed_category' not in st.session_state:
+    st.session_state.confirmed_category = None
+if 'show_all_categories' not in st.session_state: 
+    st.session_state.show_all_categories = False
+
+# --- global variables ---
+SELECT_TEXT = "-- Select a category --"
+CHOOSE_OTHER_CATEGORY_TEXT = "-- Choose another category --"
 
 # --- Helper Functions for API Calls ---
+response = None
 
 def login_user(username, password):
     """
@@ -58,6 +116,7 @@ def logout_user():
     st.session_state.access_token = None
     st.session_state.username = None
     st.session_state.user_role = None
+    st.session_state.show_prediction_message = False
     st.info("Logged out successfully.")
     st.rerun() # Rerun to update UI based on logout status
 
@@ -134,6 +193,153 @@ def get_model_info():
         st.error(f"Failed to retrieve model info: {e}")
         st.error(f"Error details: {response.text}")
         return None
+    
+def send_feedback(designation, description, predicted_label, correct_label, access_token):
+    """
+    Sends feedback about a prediction to the predict API.
+    Requires authentication.
+    """
+    headers = {"token": access_token}
+    #headers = {"Authorization": f"Bearer {access_token}"}
+    payload = {
+        "designation": designation,
+        "description": description,
+        "predicted_label": predicted_label,
+        "correct_label": correct_label
+    }
+    #response = None
+    try:
+        response = requests.post(
+            f"{PREDICT_API_BASE_URL}/feedback",
+            json=payload,
+            headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"Failed to upload article: {e}")
+        if response is not None:
+            st.error(f"Server response: {response.text}")
+        else:
+            st.error("No response from server.")
+        return None
+
+   
+# --- UI Callback Functions ---
+
+def prepare_dropdown_options(product_dict, predicted_category):
+    """
+    Prepares a list of categories for the dropdown.
+
+    Args:
+        product_dict (dict): a dictionary mapping product codes to category names.
+        predicted_category (str): name of the category predicted by the model.
+
+    Returns:
+        list: a list of category names for the dropdown, starting with the predicted category.
+    """
+    options = [predicted_category]  
+    for category in sorted(list(product_dict.values())):
+        if category != predicted_category:  
+            options.append(category)
+    return options
+
+def handle_predict_button_click():
+    """
+    Callback for the predict button.
+    Resets dropdown and handles prediction logic.
+    """
+    # Set dropdown to default "Select a class" by resetting its index
+    st.session_state.selected_category_from_dropdown_index = 0
+    st.session_state.confirmed_category = None # Clear any previous confirmation
+    st.session_state.show_prediction_message = False # Reset message visibility
+    st.session_state.show_all_categories = False
+    st.session_state.show_upload_message = False
+    st.session_state.upload_status_message = None
+    st.session_state.upload_status_type = None
+
+    designation = st.session_state.designation_input
+    description = st.session_state.description_input
+
+    if designation:
+        predicted_class = get_prediction(designation, description)
+        if predicted_class:
+            st.session_state.last_prediction = predicted_class
+            st.session_state.selected_category_from_dropdown_index = 0 # Set dropdown to predicted class
+            st.session_state.show_prediction_message = True # Show prediction message
+           
+        else:
+            st.session_state.last_prediction = None
+            st.session_state.show_prediction_message = False
+    else:
+        st.session_state.warning = "Please enter at least the **Designation**."
+
+def handle_confirm_category_click(selected_category_value):
+    """
+    Callback for the confirm category button.
+    Stores confirmed category and clears input fields/dropdown.
+    """
+    # Get the currently selected value from the selectbox
+    current_selection = selected_category_value
+
+    if current_selection != SELECT_TEXT and current_selection != CHOOSE_OTHER_CATEGORY_TEXT:
+        confirmed_category = current_selection
+
+        # Data for feedback submission
+        designation_to_send = st.session_state.designation_input
+        description_to_send = st.session_state.description_input
+        predicted_label_to_send = st.session_state.last_prediction
+        correct_label_to_send  = confirmed_category
+        
+        if not designation_to_send or not predicted_label_to_send or not correct_label_to_send or not st.session_state.access_token:
+            st.session_state.upload_status_message = "Error: Missing required fields: designation, predicted label, correct label or access token"
+            st.session_state.upload_status_type = "error"
+            st.session_state.show_upload_message = True
+            return
+
+        # Send feedback to the API
+        feedback_result = send_feedback(
+            designation_to_send,
+            description_to_send,
+            predicted_label_to_send,
+            correct_label_to_send,
+            st.session_state.access_token)
+        
+        
+        if feedback_result and feedback_result.get("status") == "success":
+            st.session_state.upload_status_message = f"Article uploaded successfully in category {confirmed_category}."
+            st.session_state.upload_status_type = "success"
+        else:
+            st.session_state.upload_status_message = f"Error: Failed to upload article in category {confirmed_category}."
+            st.session_state.upload_status_type = "error"
+
+        
+        st.session_state.show_upload_message = True
+        st.session_state.confirmed_category = current_selection
+        # a) Clear input fields and reset dropdown after confirmation
+        st.session_state.designation_input = ""
+        st.session_state.description_input = ""
+        st.session_state.last_prediction = None # Clear prediction
+        st.session_state.selected_category_from_dropdown_index = 0 # Reset dropdown
+        st.session_state.show_prediction_message = False # Hide prediction message
+        st.session_state.show_all_categories = False # Reset category selection state
+
+def handle_category_select_change():
+    """
+    Callback for when the category selectbox changes.
+    Updates the index of the selected category in session state.
+    """
+    # Get the currently selected value from the selectbox
+    selected_value = st.session_state.category_select
+
+    if selected_value == CHOOSE_OTHER_CATEGORY_TEXT:
+        st.session_state.show_all_categories = True
+        st.session_state.selected_category_from_dropdown_index = 0
+    #elif selected_value == SELECT_TEXT:
+    #    pass
+    else:
+        pass
+
 
 # --- Streamlit UI Layout ---
 
@@ -180,29 +386,94 @@ else:
             if delete_user_button:
                 delete_user(user_to_delete)
 
+        st.header("Model Management")
+        #st.subheader("Model Information")
+        if st.button("Fetch Model Info"):
+            model_info = get_model_info()
+            if model_info:
+                st.json(model_info) # Display model info in a nice JSON format
+
+        #st.subheader("Start retraining the model")
+        if st.button("Retrain Model"):
+            try:
+                subprocess.run(["docker", "compose", "up", "dvc-sync", "preprocessing", "model_training", "model_validation"], check=True)
+                st.success("Retraining was successful. Check logs for details.")
+            except subprocess.CalledProcessError as e:
+                st.error(f"Failed to start retraining: {e}")
+
+
+
     # --- Prediction Section (for all logged-in users) ---
     st.header("Product Type Prediction")
     st.markdown("---")
 
     st.subheader("Get Prediction")
     with st.form("prediction_form"):
-        designation = st.text_area("Designation", help="e.g., 'Smartphone XYZ'")
-        description = st.text_area("Description", help="e.g., 'Latest model with 128GB storage and 5G connectivity.'")
-        predict_button = st.form_submit_button("Get Prediction")
+        designation = st.text_area("Designation (required)", 
+                                   value=st.session_state.designation_input,
+                                   key="designation_input",
+                                   help="e.g., 'Voiture miniature 1976 Ford Mustang'")
+        description = st.text_area("Description (optional)", 
+                                   value=st.session_state.description_input,
+                                   key="description_input",
+                                   help="e.g., 'couleur bleu.'")
+        predict_button = st.form_submit_button("Confirm", on_click=handle_predict_button_click)
 
-        if predict_button:
-            if designation and description:
-                predicted_class = get_prediction(designation, description)
-                if predicted_class:
-                    st.success(f"Predicted Product Class: **{predicted_class}**")
-            else:
-                st.warning("Please enter both designation and description.")
+    if 'warning' in st.session_state and st.session_state.warning:
+        st.warning(st.session_state.warning)
+        st.session_state.warning = None
+    
+    if st.session_state.show_prediction_message:
+        st.info("Please select product category from the dropdown below.")
 
-    st.subheader("Model Information")
-    if st.button("Fetch Model Info"):
-        model_info = get_model_info()
-        if model_info:
-            st.json(model_info) # Display model info in a nice JSON format
+    # --- Category Selection Section --- (after prediction)
+    if st.session_state.show_prediction_message and st.session_state.last_prediction:
+        st.markdown("---")
+
+     
+        dynamic_dropdown_options = []
+
+        if not st.session_state.show_all_categories:
+            dynamic_dropdown_options = [st.session_state.last_prediction,
+                                        CHOOSE_OTHER_CATEGORY_TEXT]
+            if st.session_state.selected_category_from_dropdown_index == 0:
+                st.session_state.selected_category_from_dropdown_index = 0
+        else:
+            all_categories_sorted = prepare_dropdown_options(product_dict, st.session_state.last_prediction)
+            dynamic_dropdown_options = [SELECT_TEXT] + all_categories_sorted
+
+        current_selection = st.selectbox(
+            "Category selection",
+            options=dynamic_dropdown_options,
+            index=st.session_state.selected_category_from_dropdown_index,
+            key="category_select",
+            on_change=handle_category_select_change
+        )
+
+        if current_selection != SELECT_TEXT and current_selection != CHOOSE_OTHER_CATEGORY_TEXT:
+            st.button("Upload article", 
+                    key="confirm_category_button", 
+                    on_click=handle_confirm_category_click,
+                    args=(current_selection,))
+        
+    
+    message_placeholder = st.empty()
+
+    if st.session_state.get('show_upload_message') and st.session_state.upload_status_message:
+        if st.session_state.upload_status_type == "success":
+            message_placeholder.success(st.session_state.upload_status_message)
+        elif st.session_state.upload_status_type == "error":
+            message_placeholder.error(st.session_state.upload_status_message)
+
+        time.sleep(3) 
+
+        message_placeholder.empty() 
+        st.session_state.show_upload_message = False 
+        st.session_state.upload_status_message = None 
+        st.session_state.upload_status_type = None 
+
+
+    
 
 st.markdown("---")
 st.caption("Developed with Streamlit and FastAPI")

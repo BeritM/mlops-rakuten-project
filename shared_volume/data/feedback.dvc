@@ -1,6 +1,12 @@
 outs:
+<<<<<<< HEAD
 - md5: d751713988987e9331980363e24189ce.dir
   size: 0
   nfiles: 0
+=======
+- md5: 2c5fcbf358bf2272434a1c6250b6c8cb.dir
+  size: 1265
+  nfiles: 2
+>>>>>>> develop
   hash: md5
   path: feedback
