@@ -28,6 +28,7 @@ my_env
 /models/
 /models
 
+# airflow
 logs/
 airflow-*.pid
 airflow-webserver.pid
