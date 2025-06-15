@@ -186,6 +186,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # WICHTIG: User explizit setzen für Permission-Konsistenz
+    #user: "50000:0"
     env_file:
       - .env
     environment:
@@ -193,8 +195,8 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__WARN_DEPLOYMENT_EXPOSURE: 'false'
-      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG # DEBUG Level für Airflow Logs to enable detailed logging
-      # Docker-in-Docker Support - Windows compatibility
+      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
+      # Docker-in-Docker Support
       DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
       # Git/DVC Credentials passthrough
       GITHUB_TOKEN: ${GITHUB_TOKEN}
@@ -206,13 +208,14 @@ services:
       HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
     volumes:
       ###############  
-      - dvc-cache:/opt/airflow/project/.dvc/cache  # DVC Cache für Airflow, damit Airflow auf DVC-Daten zugreifen kann  
+      # GEÄNDERT: Bind Mount statt Named Volume für bessere Permission-Kontrolle
+      - ${HOST_PROJECT_PATH}/.dvc/cache:/opt/airflow/project/.dvc/cache:rw
       ###############  
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./shared_volume:/opt/airflow/shared_volume
       - ./.env:/opt/airflow/.env
-      # Docker-in-Docker: Docker Socket mounten (Linux/Mac)
+      # Docker-in-Docker: Docker Socket mounten
       - /var/run/docker.sock:/var/run/docker.sock
       # Projekt-Root für docker-compose Zugriff
       - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro  
@@ -234,13 +237,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # WICHTIG: User explizit setzen für Permission-Konsistenz
+    #user: "50000:0"
     env_file:
       - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      # Docker-in-Docker Support - Windows compatibility
+      # Docker-in-Docker Support
       DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
       # Git/DVC Credentials passthrough
       GITHUB_TOKEN: ${GITHUB_TOKEN}
@@ -252,13 +257,14 @@ services:
       HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
     volumes:
       ###############  
-      - dvc-cache:/opt/airflow/project/.dvc/cache  # DVC Cache für Airflow um DVC-Pipelines zu unterstützen  
+      # GEÄNDERT: Bind Mount statt Named Volume für bessere Permission-Kontrolle
+      - ${HOST_PROJECT_PATH}/.dvc/cache:/opt/airflow/project/.dvc/cache:rw
       ###############  
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./shared_volume:/opt/airflow/shared_volume
       - ./.env:/opt/airflow/.env
-      # Docker-in-Docker: Docker Socket mounten (Linux/Mac)
+      # Docker-in-Docker: Docker Socket mounten
       - /var/run/docker.sock:/var/run/docker.sock
       # Projekt-Root für docker-compose Zugriff
       - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro 
@@ -292,5 +298,5 @@ services:
     command: -c "airflow db init && airflow users create --role Admin --username ${_AIRFLOW_WWW_USER_USERNAME} --email airflow@airflow.com --firstname admin --lastname admin --password ${_AIRFLOW_WWW_USER_PASSWORD}"
 
 volumes:
-  dvc-cache:
+  dvc-cache: 
   postgres-db-volume:

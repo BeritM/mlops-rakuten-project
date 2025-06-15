@@ -43,7 +43,8 @@ RUN pip install --no-cache-dir \
       apache-airflow-providers-docker==3.8.0 \
       docker \
       python-dotenv \
-      "dvc[s3]"
+#      "dvc[s3]"
+      dvc[s3]
 
 # ─── Set PYTHONPATH ─────────────────────────────────────────────────────────────
 ENV PYTHONPATH=/opt/airflow/project:$PYTHONPATH

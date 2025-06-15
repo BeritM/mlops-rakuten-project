@@ -132,6 +132,7 @@ def main():
         df["cleaned_text"] = df.apply(lambda row: ProductTypePredictorMLflow.clean_text_static(row["designation"], row["description"]), axis=1)   
         print(f"Text cleaning completed. Sample cleaned text: {df['cleaned_text'].iloc[0][:100]}...")
         print(df.head())
+        print(df['prdtypecode'].value_counts(ascending=True))
 
         # 3. Train/Validate/Test Split
         print("\n3. Splitting dataset...")
