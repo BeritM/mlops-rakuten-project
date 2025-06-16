@@ -6,7 +6,8 @@ services:
     volumes:
       - .:/app
       - ./.git:/app/.git:ro  # Git repository explizit mounten (read-only)
-      - dvc-cache:/app/.dvc/cache
+      #- dvc-cache:/app/.dvc/cache
+      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:ro
       - ./shared_volume:/app/shared_volume
     working_dir: /app
     environment:
@@ -29,7 +30,8 @@ services:
       dockerfile: "dockerfiles/preprocessing/Dockerfile"
     volumes:
       - .:/app
-      - dvc-cache:/app/.dvc/cache
+      #- dvc-cache:/app/.dvc/cache
+      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
     env_file:
@@ -54,7 +56,8 @@ services:
       dockerfile: dockerfiles/model_training/Dockerfile
     volumes:
       - .:/app
-      - dvc-cache:/app/.dvc/cache
+      #- dvc-cache:/app/.dvc/cache
+      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
     env_file:
@@ -78,7 +81,8 @@ services:
       dockerfile: "dockerfiles/model_validation/Dockerfile"
     volumes:
       - .:/app
-      - dvc-cache:/app/.dvc/cache
+      #- dvc-cache:/app/.dvc/cache
+      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
     env_file:
@@ -125,7 +129,8 @@ services:
     volumes:
       - .:/app
       - ./shared_volume:/app/shared_volume
-      - dvc-cache:/app/.dvc/cache
+      #- dvc-cache:/app/.dvc/cache
+      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
     working_dir: /app
     depends_on:
       auth_service:
@@ -145,7 +150,8 @@ services:
       dockerfile: dockerfiles/tests/Dockerfile
     volumes:
       - .:/app
-      - dvc-cache:/app/.dvc/cache
+      #- dvc-cache:/app/.dvc/cache
+      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
     env_file:
@@ -264,9 +270,9 @@ services:
       - ./logs:/opt/airflow/logs
       - ./shared_volume:/opt/airflow/shared_volume
       - ./.env:/opt/airflow/.env
-      # Docker-in-Docker: Docker Socket mounten
+      # Docker-in-Docker: Mount Docker Socket
       - /var/run/docker.sock:/var/run/docker.sock
-      # Projekt-Root für docker-compose Zugriff
+      # Project-Root for docker-compose access
       - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro 
       - ./:/opt/airflow/project
     command: scheduler
