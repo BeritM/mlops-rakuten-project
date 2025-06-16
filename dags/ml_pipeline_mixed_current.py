@@ -19,6 +19,7 @@ load_dotenv('/opt/airflow/.env')
 
 logger = logging.getLogger(__name__)
 
+
 default_args = {
     'owner': 'mlops-team',
     'depends_on_past': False,
@@ -93,16 +94,28 @@ with DAG(
             log.info(f"Ensured directory exists: {directory}")
         
         # Try to get airflow user info
-        try:
-            airflow_user = pwd.getpwnam('airflow')
-            airflow_uid = airflow_user.pw_uid
-            airflow_gid = airflow_user.pw_gid
-            log.info(f"Airflow user: uid={airflow_uid}, gid={airflow_gid}")
-        except KeyError:
-            # Fallback to current user
-            airflow_uid = os.getuid()
-            airflow_gid = os.getgid()
-            log.info(f"Using current user: uid={airflow_uid}, gid={airflow_gid}")
+        def get_user_info():
+            try:
+                airflow_user = pwd.getpwnam('airflow')
+                airflow_uid = airflow_user.pw_uid
+                airflow_gid = airflow_user.pw_gid
+                #log.info(f"Airflow user: uid={airflow_uid}, gid={airflow_gid}")
+                return airflow_uid, airflow_gid
+            except KeyError:
+                # Fallback to current user
+                current_uid = os.getuid()
+                try:
+                    staff_group = grp.getgrnam('staff')
+                #airflow_uid = os.getuid()
+                #airflow_gid = os.getgid()
+                    #log.info(f"Using current user: uid={current_uid}, gid={staff_group.gr_gid}")
+                    return current_uid, staff_group.gr_gid
+                except KeyError:
+                    #log.info(f"Airflow user: uid={airflow_uid}, gid={airflow_gid}")
+                    return current_uid, os.getgid()
+                
+        airflow_uid, airflow_gid = get_user_info()
+        log.info(f"Using user: uid={airflow_uid}, gid={airflow_gid}")
         
         # Set ownership and permissions recursively
         def fix_permissions(path):
