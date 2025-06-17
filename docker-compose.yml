@@ -7,9 +7,10 @@ services:
       - .:/app
       - ./.git:/app/.git:ro  # Git repository explizit mounten (read-only)
       #- dvc-cache:/app/.dvc/cache
-      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:ro
+      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
+    #user: ${AIRFLOW_UID}:0
     environment:
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
@@ -34,6 +35,7 @@ services:
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     environment:
@@ -60,7 +62,7 @@ services:
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
-    env_file:
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
       - .env
     environment:
       - PYTHONPATH=/app
@@ -85,6 +87,7 @@ services:
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}0
     env_file:
       - .env
     environment:
@@ -104,6 +107,7 @@ services:
     build:
       context: "."
       dockerfile: "dockerfiles/auth_service/Dockerfile"
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     ports:
@@ -132,6 +136,7 @@ services:
       #- dvc-cache:/app/.dvc/cache
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
     working_dir: /app
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     depends_on:
       auth_service:
         condition: service_healthy
@@ -154,6 +159,7 @@ services:
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     depends_on:
@@ -193,7 +199,7 @@ services:
       postgres:
         condition: service_healthy
     # WICHTIG: User explizit setzen für Permission-Konsistenz
-    #user: "50000:0"
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     environment:
@@ -244,7 +250,7 @@ services:
       postgres:
         condition: service_healthy
     # WICHTIG: User explizit setzen für Permission-Konsistenz
-    #user: "50000:0"
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     environment:
@@ -285,6 +291,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow

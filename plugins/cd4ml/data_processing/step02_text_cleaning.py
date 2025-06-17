@@ -6,9 +6,9 @@ from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 
 # Download required resources once
-nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('wordnet')
+#nltk.download('punkt')
+#nltk.download('stopwords')
+#nltk.download('wordnet')
 
 # Get stopwords for English and French and also custom stopwords
 stop_words_eng = set(stopwords.words('english'))

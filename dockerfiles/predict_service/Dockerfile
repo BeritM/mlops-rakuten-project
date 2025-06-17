@@ -18,10 +18,13 @@ COPY dockerfiles/predict_service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
   && pip install --no-cache-dir "dvc[s3]"
 
+RUN python -c "import nltk; nltk.download('stopwords', download_dir='/usr/local/share/nltk_data'); nltk.download('punkt', download_dir='/usr/local/share/nltk_data'); nltk.download('wordnet', download_dir='/usr/local/share/nltk_data'); nltk.download('punkt_tab', download_dir='/usr/local/share/nltk_data')"
+ENV NLTK_DATA=/usr/local/share/nltk_data
+
 COPY . .
 
 # Download NLTK stopwords
-RUN python -c "import nltk; nltk.download('stopwords'); nltk.download('punkt'); nltk.download('wordnet'); nltk.download('punkt_tab')"
+#RUN python -c "import nltk; nltk.download('stopwords'); nltk.download('punkt'); nltk.download('wordnet'); nltk.download('punkt_tab')"
 
 # Expose port
 EXPOSE 8002
