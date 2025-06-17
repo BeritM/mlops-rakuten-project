@@ -1,3 +1,8 @@
+volumes:
+  shared_volume: {}
+  dvc-cache: {}
+  postgres-db-volume: {}
+
 services:
   dvc-sync:
     build:
@@ -8,7 +13,8 @@ services:
       - ./.git:/app/.git:ro  # Git repository explizit mounten (read-only)
       #- dvc-cache:/app/.dvc/cache
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
-      - ./shared_volume:/app/shared_volume
+      #- ./shared_volume:/app/shared_volume
+      - shared_volume:/app/shared_volume
     working_dir: /app
     #user: ${AIRFLOW_UID}:0
     environment:
@@ -16,14 +22,7 @@ services:
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
     command: ["dvc", "pull", "shared_volume/data/raw", "shared_volume/data/processed", "shared_volume/data/feedback", "shared_volume/models", "--force"]
-    #command: >
-    #  bash -c "
-    #  dvc config cache.protected false &&
-    #  dvc pull shared_volume/data/raw --force &&
-    #  dvc pull shared_volume/data/processed --force &&
-    #  dvc pull shared_volume/data/feedback --force &&
-    #  dvc pull shared_volume/models --force
-    #  "
+  
 
   preprocessing:
     build:
@@ -35,7 +34,7 @@ services:
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
-    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     environment:
@@ -62,7 +61,8 @@ services:
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
-    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
+    env_file:
       - .env
     environment:
       - PYTHONPATH=/app
@@ -87,7 +87,7 @@ services:
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
-    user: ${AIRFLOW_UID}:${AIRFLOW_GID}0
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}0
     env_file:
       - .env
     environment:
@@ -132,11 +132,12 @@ services:
       - "8002:8002"
     volumes:
       - .:/app
-      - ./shared_volume:/app/shared_volume
+      #- ./shared_volume:/app/shared_volume
+      - shared_volume:/app/shared_volume
       #- dvc-cache:/app/.dvc/cache
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
     working_dir: /app
-    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     depends_on:
       auth_service:
         condition: service_healthy
@@ -159,7 +160,7 @@ services:
       - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       - ./shared_volume:/app/shared_volume
     working_dir: /app
-    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     depends_on:
@@ -310,6 +311,6 @@ services:
     entrypoint: /bin/bash
     command: -c "airflow db init && airflow users create --role Admin --username ${_AIRFLOW_WWW_USER_USERNAME} --email airflow@airflow.com --firstname admin --lastname admin --password ${_AIRFLOW_WWW_USER_PASSWORD}"
 
-volumes:
-  dvc-cache: 
-  postgres-db-volume:
+#volumes:
+#  dvc-cache: 
+#  postgres-db-volume:

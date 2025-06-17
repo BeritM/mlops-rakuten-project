@@ -66,6 +66,7 @@ with DAG(
         python_callable=check_env,
     )
 
+
     # 1. DVC sync with proper permission handling
     def run_dvc_pull(**context):
         import os
@@ -103,16 +104,17 @@ with DAG(
                 return airflow_uid, airflow_gid
             except KeyError:
                 # Fallback to current user
-                current_uid = os.getuid()
-                try:
-                    staff_group = grp.getgrnam('staff')
-                #airflow_uid = os.getuid()
-                #airflow_gid = os.getgid()
+                #current_uid = os.getuid()
+                #try:
+                #    staff_group = grp.getgrnam('staff')
+                airflow_uid = os.getuid()
+                airflow_gid = os.getgid()
                     #log.info(f"Using current user: uid={current_uid}, gid={staff_group.gr_gid}")
-                    return current_uid, staff_group.gr_gid
-                except KeyError:
+                #    return current_uid, staff_group.gr_gid
+                return airflow_uid, airflow_gid
+                #except KeyError:
                     #log.info(f"Airflow user: uid={airflow_uid}, gid={airflow_gid}")
-                    return current_uid, os.getgid()
+                #    return current_uid, os.getgid()
                 
         airflow_uid, airflow_gid = get_user_info()
         log.info(f"Using user: uid={airflow_uid}, gid={airflow_gid}")
