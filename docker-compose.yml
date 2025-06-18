@@ -1,20 +1,20 @@
 volumes:
-  shared_volume: {}
-  dvc-cache: {}
+  shared-volume: {}
+  dvc-cache-volume: {}
   postgres-db-volume: {}
 
 services:
   dvc-sync:
     build:
-      context: "./dockerfiles/dvc"
-      dockerfile: "Dockerfile"
+      context: "."
+      dockerfile: "./dockerfiles/dvc/Dockerfile"
     volumes:
-      - .:/app
-      - ./.git:/app/.git:ro  # Git repository explizit mounten (read-only)
-      #- dvc-cache:/app/.dvc/cache
-      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      #- ${HOST_PROJECT_PATH}:/app
+      #- ./.git:/app/.git:ro  # Git repository explizit mounten (read-only)
+      - dvc-cache-volume:/app/.dvc/_cache
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
       #- ./shared_volume:/app/shared_volume
-      - shared_volume:/app/shared_volume
+      - shared-volume:/app/shared-volume # Named volume
     working_dir: /app
     #user: ${AIRFLOW_UID}:0
     environment:
@@ -31,8 +31,10 @@ services:
     volumes:
       - .:/app
       #- dvc-cache:/app/.dvc/cache
-      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
-      - ./shared_volume:/app/shared_volume
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      - dvc-cache-volume:/app/.dvc/_cache:rw
+      #- ./shared_volume:/app/shared_volume
+      - shared-volume:/app/shared-volume
     working_dir: /app
     #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
@@ -58,8 +60,10 @@ services:
     volumes:
       - .:/app
       #- dvc-cache:/app/.dvc/cache
-      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
-      - ./shared_volume:/app/shared_volume
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      - dvc-cache-volume:/app/.dvc/_cache:rw
+      #- ./shared_volume:/app/shared_volume
+      - shared-volume:/app/shared-volume
     working_dir: /app
     #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
@@ -84,8 +88,10 @@ services:
     volumes:
       - .:/app
       #- dvc-cache:/app/.dvc/cache
-      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
-      - ./shared_volume:/app/shared_volume
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      - dvc-cache-volume:/app/.dvc/_cache:rw
+      #- ./shared_volume:/app/shared_volume
+      - shared-volume:/app/shared-volume
     working_dir: /app
     #user: ${AIRFLOW_UID}:${AIRFLOW_GID}0
     env_file:
@@ -133,9 +139,9 @@ services:
     volumes:
       - .:/app
       #- ./shared_volume:/app/shared_volume
-      - shared_volume:/app/shared_volume
-      #- dvc-cache:/app/.dvc/cache
-      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      - shared-volume:/app/shared-volume
+      - dvc-cache-volume:/app/.dvc/_cache
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
     working_dir: /app
     #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     depends_on:
@@ -157,8 +163,10 @@ services:
     volumes:
       - .:/app
       #- dvc-cache:/app/.dvc/cache
-      - ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
-      - ./shared_volume:/app/shared_volume
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      - dvc-cache-volume:/app/.dvc/_cache:rw
+      #- ./shared_volume:/app/shared-volume
+      - shared-volume:/app/shared-volume
     working_dir: /app
     #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
@@ -218,20 +226,22 @@ services:
       DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
       DAGSHUB_REPO_OWNER: ${DAGSHUB_REPO_OWNER}
       DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
-      HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
+      #HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
     volumes:
       ###############  
       # GEÄNDERT: Bind Mount statt Named Volume für bessere Permission-Kontrolle
-      - ${HOST_PROJECT_PATH}/.dvc/cache:/opt/airflow/project/.dvc/cache:rw
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/opt/airflow/project/.dvc/cache:rw
+      - dvc-cache-volume:/opt/airflow/project/.dvc/_cache:rw
       ###############  
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
-      - ./shared_volume:/opt/airflow/shared_volume
-      - ./.env:/opt/airflow/.env
+      #- ./shared_volume:/opt/airflow/shared_volume
+      - shared-volume:/opt/airflow/project/shared-volume # named volume
+      #- ./.env:/opt/airflow/.env
       # Docker-in-Docker: Docker Socket mounten
       - /var/run/docker.sock:/var/run/docker.sock
       # Projekt-Root für docker-compose Zugriff
-      - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro  
+      - ./docker-compose.yml:/opt/airflow/project/docker-compose.yml:ro  
       - ./:/opt/airflow/project
     ports:
       - "8080:8080"
@@ -267,20 +277,22 @@ services:
       DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
       DAGSHUB_REPO_OWNER: ${DAGSHUB_REPO_OWNER}
       DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
-      HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
+      #HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
     volumes:
       ###############  
       # GEÄNDERT: Bind Mount statt Named Volume für bessere Permission-Kontrolle
-      - ${HOST_PROJECT_PATH}/.dvc/cache:/opt/airflow/project/.dvc/cache:rw
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/opt/airflow/project/.dvc/cache:rw
+      - dvc-cache-volume:/opt/airflow/project/.dvc/cache:rw
       ###############  
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
-      - ./shared_volume:/opt/airflow/shared_volume
-      - ./.env:/opt/airflow/.env
+      #- ./shared_volume:/opt/airflow/shared_volume
+      - shared-volume:/opt/airflow/project/shared-volume # named volume
+      #- ./.env:/opt/airflow/.env
       # Docker-in-Docker: Mount Docker Socket
       - /var/run/docker.sock:/var/run/docker.sock
       # Project-Root for docker-compose access
-      - ./docker-compose.yml:/opt/airflow/docker-compose.yml:ro 
+      - ./docker-compose.yml:/opt/airflow/project/docker-compose.yml:ro 
       - ./:/opt/airflow/project
     command: scheduler
     restart: always
@@ -293,6 +305,8 @@ services:
       postgres:
         condition: service_healthy
     user: ${AIRFLOW_UID}:${AIRFLOW_GID}
+    env_file:
+      - .env
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -304,7 +318,7 @@ services:
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD}
       _PIP_ADDITIONAL_REQUIREMENTS: ''
-      HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
+      #HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
