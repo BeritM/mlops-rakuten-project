@@ -4,6 +4,7 @@ set -e
 CONTAINER_UID=${AIRFLOW_UID:-50000}
 CONTAINER_GID=${AIRFLOW_GID:-0}
 
+
 # Überprüfen, ob das Verzeichnis /app/shared_volume leer ist
 # Wenn ja, initialisiere die Berechtigungen
 if [ -z "$(ls -A /app/shared_volume)" ]; then

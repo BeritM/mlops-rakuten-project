@@ -18,7 +18,8 @@ RUN pip install dvc[s3]
 # Set working directory to /app (where the code is mounted)
 WORKDIR /app
 
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY ./ /app/
+COPY dockerfiles/dvc/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Set the entrypoint script - user permissions
