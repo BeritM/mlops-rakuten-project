@@ -73,7 +73,7 @@ RETRAIN_RAW_PATH      = os.path.join(RAW_DIR, os.getenv("RETRAIN_RAW")) # type: 
 def validate_environment():
     """Validate that all required environment variables are set."""
     required_vars = [
-        "DATA_RAW_DIR", "DATA_PROCESSED_DIR", "MODEL_DIR",
+        "DATA_RAW_DIR", "DATA_PROCESSED_DIR", "MODEL_DIR", "DATA_FEEDBACK_DIR",
         "X_RAW", "Y_RAW", "X_Y_RAW",
         "X_TRAIN_TFIDF", "X_VALIDATE_TFIDF", "X_TEST_TFIDF",
         "TFIDF_VECTORIZER", "Y_TRAIN", "Y_VALIDATE", "Y_TEST"
@@ -99,6 +99,7 @@ def main():
         print(f"Raw data directory: {RAW_DIR}")
         print(f"Processed data directory: {PROC_DIR}")
         print(f"Model directory: {MODEL_DIR}")
+        print(f"Feedback directory: {FEEDBACK_DIR}")
 
         # 1.a Load and combine raw data
         if not os.path.exists(X_Y_RAW_PATH):
