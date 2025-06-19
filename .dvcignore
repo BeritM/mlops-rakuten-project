@@ -27,6 +27,7 @@ logs/
 
 # Optional
 notebooks/
+monitoring/
 #shared_volume/
 #.models/
 #models/

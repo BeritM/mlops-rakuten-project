@@ -50,5 +50,6 @@ models
 logs/
 docs
 data
+monitoring/
 #dags
 
