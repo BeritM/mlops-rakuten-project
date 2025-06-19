@@ -1,18 +1,28 @@
+volumes:
+  shared-volume: {}
+  dvc-cache-volume: {}
+  postgres-db-volume: {}
+
 services:
   dvc-sync:
     build:
-      context: "./dockerfiles/dvc"
-      dockerfile: "Dockerfile"
+      context: "."
+      dockerfile: "./dockerfiles/dvc/Dockerfile"
     volumes:
-      - .:/app
-      - dvc-cache:/app/.dvc/cache
-      - ./shared_volume:/app/shared_volume
+      #- ${HOST_PROJECT_PATH}:/app
+      #- ./.git:/app/.git:ro  # Git repository explizit mounten (read-only)
+      - dvc-cache-volume:/app/.dvc/_cache
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      #- ./shared_volume:/app/shared_volume
+      - shared-volume:/app/shared-volume # Named volume
     working_dir: /app
+    #user: ${AIRFLOW_UID}:0
     environment:
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
     command: ["dvc", "pull", "shared_volume/data/raw", "shared_volume/data/processed", "shared_volume/data/feedback", "shared_volume/models", "--force"]
+  
 
   preprocessing:
     build:
@@ -20,14 +30,20 @@ services:
       dockerfile: "dockerfiles/preprocessing/Dockerfile"
     volumes:
       - .:/app
-      - dvc-cache:/app/.dvc/cache
-      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+      #- dvc-cache:/app/.dvc/cache
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      - dvc-cache-volume:/app/.dvc/_cache:rw
+      #- ./shared_volume:/app/shared_volume
+      - shared-volume:/app/shared-volume
     working_dir: /app
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - HOST_PROJECT_PATH=${HOST_PROJECT_PATH}
+      # Git credentials für DVC push
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
       - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
@@ -43,14 +59,19 @@ services:
       dockerfile: dockerfiles/model_training/Dockerfile
     volumes:
       - .:/app
-      - dvc-cache:/app/.dvc/cache
-      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+      #- dvc-cache:/app/.dvc/cache
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      - dvc-cache-volume:/app/.dvc/_cache:rw
+      #- ./shared_volume:/app/shared_volume
+      - shared-volume:/app/shared-volume
     working_dir: /app
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      # Git credentials für DVC push
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
       - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
@@ -66,14 +87,19 @@ services:
       dockerfile: "dockerfiles/model_validation/Dockerfile"
     volumes:
       - .:/app
-      - dvc-cache:/app/.dvc/cache
-      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
+      #- dvc-cache:/app/.dvc/cache
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      - dvc-cache-volume:/app/.dvc/_cache:rw
+      #- ./shared_volume:/app/shared_volume
+      - shared-volume:/app/shared-volume
     working_dir: /app
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}0
     env_file:
       - .env
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      # Git credentials für DVC push
       - GITHUB_TOKEN=${GITHUB_TOKEN}
       - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
       - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
@@ -87,6 +113,7 @@ services:
     build:
       context: "."
       dockerfile: "dockerfiles/auth_service/Dockerfile"
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     ports:
@@ -104,24 +131,19 @@ services:
       dockerfile: "dockerfiles/predict_service/Dockerfile"
     env_file:
       - .env
-    environment: # eventually insert completely into .env
+    environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - GITHUB_REPO_OWNER=${GITHUB_REPO_OWNER}
-      - GITHUB_REPO_NAME=${GITHUB_REPO_NAME}
-      - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
-      - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
-      - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
-      #- DATA_FEEDBACK_DIR=${DATA_FEEDBACK_DIR}
-      #- FEEDBACK_CSV_PATH=${FEEDBACK_CSV_PATH}
     ports:
       - "8002:8002"
     volumes:
       - .:/app
-      - ./shared_volume:/app/shared_volume  # Mount shared_volume as a whole
-      - dvc-cache:/app/.dvc/cache
+      #- ./shared_volume:/app/shared_volume
+      - shared-volume:/app/shared-volume
+      - dvc-cache-volume:/app/.dvc/_cache
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
     working_dir: /app
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     depends_on:
       auth_service:
         condition: service_healthy
@@ -140,9 +162,13 @@ services:
       dockerfile: dockerfiles/tests/Dockerfile
     volumes:
       - .:/app
-      - dvc-cache:/app/.dvc/cache
-      - ./shared_volume:/app/shared_volume
+      #- dvc-cache:/app/.dvc/cache
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/app/.dvc/cache:rw
+      - dvc-cache-volume:/app/.dvc/_cache:rw
+      #- ./shared_volume:/app/shared-volume
+      - shared-volume:/app/shared-volume
     working_dir: /app
+    #user: ${AIRFLOW_UID}:${AIRFLOW_GID}
     env_file:
       - .env
     depends_on:
@@ -158,6 +184,147 @@ services:
       - default
     command: >
       sh -c "pytest plugins/cd4ml/tests/test_predict_service.py -v -rA"
-      
-volumes:
-  dvc-cache:
+
+ # === AIRFLOW SERVICES ===
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+    restart: always
+
+  airflow-webserver:
+    build:
+      context: ./dockerfiles/airflow
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # WICHTIG: User explizit setzen für Permission-Konsistenz
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__WARN_DEPLOYMENT_EXPOSURE: 'false'
+      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
+      # Docker-in-Docker Support
+      DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      # Git/DVC Credentials passthrough
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_REPO_OWNER: ${GITHUB_REPO_OWNER}
+      GITHUB_REPO_NAME: ${GITHUB_REPO_NAME}
+      DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
+      DAGSHUB_REPO_OWNER: ${DAGSHUB_REPO_OWNER}
+      DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
+      #HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
+    volumes:
+      ###############  
+      # GEÄNDERT: Bind Mount statt Named Volume für bessere Permission-Kontrolle
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/opt/airflow/project/.dvc/cache:rw
+      - dvc-cache-volume:/opt/airflow/project/.dvc/_cache:rw
+      ###############  
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      #- ./shared_volume:/opt/airflow/shared_volume
+      - shared-volume:/opt/airflow/project/shared-volume # named volume
+      #- ./.env:/opt/airflow/.env
+      # Docker-in-Docker: Docker Socket mounten
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Projekt-Root für docker-compose Zugriff
+      - ./docker-compose.yml:/opt/airflow/project/docker-compose.yml:ro  
+      - ./:/opt/airflow/project
+    ports:
+      - "8080:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: always
+
+  airflow-scheduler:
+    build:
+      context: ./dockerfiles/airflow
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # WICHTIG: User explizit setzen für Permission-Konsistenz
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      # Docker-in-Docker Support
+      DOCKER_HOST: ${DOCKER_HOST:-unix:///var/run/docker.sock}
+      # Git/DVC Credentials passthrough
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_REPO_OWNER: ${GITHUB_REPO_OWNER}
+      GITHUB_REPO_NAME: ${GITHUB_REPO_NAME}
+      DAGSHUB_USER_TOKEN: ${DAGSHUB_USER_TOKEN}
+      DAGSHUB_REPO_OWNER: ${DAGSHUB_REPO_OWNER}
+      DAGSHUB_REPO_NAME: ${DAGSHUB_REPO_NAME}
+      #HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
+    volumes:
+      ###############  
+      # GEÄNDERT: Bind Mount statt Named Volume für bessere Permission-Kontrolle
+      #- ${HOST_PROJECT_PATH}/.dvc/cache:/opt/airflow/project/.dvc/cache:rw
+      - dvc-cache-volume:/opt/airflow/project/.dvc/cache:rw
+      ###############  
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      #- ./shared_volume:/opt/airflow/shared_volume
+      - shared-volume:/opt/airflow/project/shared-volume # named volume
+      #- ./.env:/opt/airflow/.env
+      # Docker-in-Docker: Mount Docker Socket
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Project-Root for docker-compose access
+      - ./docker-compose.yml:/opt/airflow/project/docker-compose.yml:ro 
+      - ./:/opt/airflow/project
+    command: scheduler
+    restart: always
+
+  airflow-init:
+    build:
+      context: ./dockerfiles/airflow
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    user: ${AIRFLOW_UID}:${AIRFLOW_GID}
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD}
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
+      #HOST_PROJECT_PATH: ${HOST_PROJECT_PATH}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+    entrypoint: /bin/bash
+    command: -c "airflow db init && airflow users create --role Admin --username ${_AIRFLOW_WWW_USER_USERNAME} --email airflow@airflow.com --firstname admin --lastname admin --password ${_AIRFLOW_WWW_USER_PASSWORD}"
+
+#volumes:
+#  dvc-cache: 
+#  postgres-db-volume:

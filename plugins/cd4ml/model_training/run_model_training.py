@@ -208,9 +208,9 @@ def main():
             print(f"Run ID saved to: {RUN_ID_PATH}")
 
         ## 6. Save model locally
-        #print("\n6. Saving model locally...")
-        #joblib.dump(model, MODEL_PATH)
-        #print(f"Model saved to: {MODEL_PATH}")
+        print("\n6. Saving model locally...")
+        joblib.dump(model, MODEL_PATH)
+        print(f"Model saved to: {MODEL_PATH}")
         
         # Summary
         print("\n" + "=" * 60)
