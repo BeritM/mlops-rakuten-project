@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'auth_service'
+    static_configs:
+      - targets: ['auth_service:8001']
+
+  #- job_name: 'predict_service'
+  #  static_configs:
+  #    - targets: ['predict_service:8002']
+
+#  - job_name: 'pushgateway'
+#    honor_labels: true
+#    metrics_path: /metrics
+#    static_configs:
+#      - targets:
+#          - 'pushgateway:9091'
+
+#  - job_name: 'drift_metrics'
+#    metrics_path: /metrics
+#    static_configs:
+#      - targets:
+#          - 'drift_monitor_service:8003'
+
+#  - job_name: 'prometheus'
+#    scrape_interval: 5s
+#    metrics_path: /metrics
+#    static_configs:
+#      - targets:
+#          - 'localhost:9090'
+
+#alerting:
+#  alertmanagers:
+#    - static_configs:
+#        - targets:
+#            - 'alertmanager:9093'
+
+#rule_files:
+#  - '/etc/prometheus/alert_rules.yml'
