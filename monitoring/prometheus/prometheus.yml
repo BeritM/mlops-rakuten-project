@@ -7,10 +7,11 @@ scrape_configs:
     static_configs:
       - targets: ['auth_service:8001']
 
-  #- job_name: 'predict_service'
-  #  static_configs:
-  #    - targets: ['predict_service:8002']
+  - job_name: 'predict_service'
+    static_configs:
+      - targets: ['predict_service:8002']
 
+## ISABELL ##
 #  - job_name: 'pushgateway'
 #    honor_labels: true
 #    metrics_path: /metrics

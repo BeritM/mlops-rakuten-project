@@ -1,11 +1,14 @@
 ### --- auth_api.py ---
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from jose import JWTError, jwt
 from hashlib import sha256
 from datetime import datetime, timedelta
 from typing import Dict
+import time
+from prometheus_client import generate_latest, Counter, Histogram
+from prometheus_client.metrics import MetricWrapperBase
 
 # --- FastAPI Setup ---
 auth_app = FastAPI()
@@ -45,7 +48,60 @@ class UserCreate(BaseModel):
     password: str
     role: str = "user"
 
-# --- Auth Endpoints ---
+# ----------------------------------------------------
+# Prometheus Metrics
+# ----------------------------------------------------
+
+# Counter for number of requests
+REQUEST_COUNT = Counter(
+    'auth_service_requests_total',
+    'Total number of requests to auth_service',
+    ['method', 'endpoint', 'status_code'] 
+)
+
+# Histogram for request latency
+REQUEST_LATENCY = Histogram(
+    'auth_service_request_latency_seconds',
+    'Request latency in seconds for auth_service',
+    ['method', 'endpoint']
+)
+
+# Optional: Counter for failed authentications --> needs additional code in /login
+#FAILED_AUTH_ATTEMPTS = Counter(
+#    'auth_service_failed_auth_attempts_total',
+#    'Total number of failed authentication attempts'
+#)
+
+# Optional: Counter for successful authentications --> needs additional code in /login
+#SUCCESSFUL_AUTH_ATTEMPTS = Counter(
+#    'auth_service_successful_auth_attempts_total',
+#    'Total number of successful authentication attempts'
+#)
+
+# Middleware for collecting metrics for EVERY request
+@auth_app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+
+    # Collecting of general request metrics
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status_code=response.status_code
+    ).inc()
+    REQUEST_LATENCY.labels(
+        method=request.method,
+        endpoint=request.url.path
+    ).observe(process_time)
+
+    return response
+
+# ----------------------------------------------------
+# Auth Endpoints
+# ----------------------------------------------------
+
 @auth_app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
     user = users_db.get(form_data.username)
@@ -86,3 +142,12 @@ def delete_user(username: str, user=Depends(admin_required)):
 @auth_app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+# ----------------------------------------------------
+# Prometheus Metriken Endpoint
+# ----------------------------------------------------
+
+@auth_app.get("/metrics")
+async def metrics():
+    # generate_latest() erzeugt die Prometheus-Textformat-Ausgabe
+    return Response(content=generate_latest(), media_type="text/plain; version=0.0.4; charset=utf-8")
