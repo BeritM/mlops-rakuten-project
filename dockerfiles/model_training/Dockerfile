@@ -1,7 +1,5 @@
-# Use a slim base image
 FROM python:3.11-slim
 
-# Set working directory for the build context initially
 WORKDIR /app
 
 # Install system dependencies, including Git and gosu
@@ -22,13 +20,10 @@ RUN pip install --no-cache-dir "dvc[s3]"
 COPY dockerfiles/model_training/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Copy the rest of your application code
 COPY . .
 
-# Set environment variables
 ENV MODEL_OUTPUT_DIR=/app/models
 ENV DATA_INPUT_DIR=/app/data/processed
 
-# Set the entrypoint to our script, and the default command
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["python", "plugins/cd4ml/model_training/run_model_training.py"]
