@@ -22,11 +22,10 @@ __pycache__/
 logs/
 *.log
 
-# Personal data
-00.to_do.txt
 
 # Optional
 notebooks/
+monitoring/
 #shared_volume/
 #.models/
 #models/
@@ -39,3 +38,9 @@ git-workflow.md
 dvc_push_manager.py
 docker-compose.inference.yml
 Makefile
+READ_ME_FOR_AIRFLOW.md
+READ_ME_FOR_DVC.md
+README_drift.md
+webserver_config.py
+
+
