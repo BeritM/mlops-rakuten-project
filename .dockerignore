@@ -50,5 +50,15 @@ models
 logs/
 docs
 data
+monitoring/
 #dags
+
+# Other
+ui_app.py
+git-workflow.md
+main.py
+READ_ME_FOR AIRFLOW.md
+READ_ME_drift.md
+
+
 
