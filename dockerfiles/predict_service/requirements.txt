@@ -1,4 +1,5 @@
 # requirements.txt
+evidently
 fastapi==0.115.12
 uvicorn[standard]==0.34.0
 scikit-learn==1.6.1
