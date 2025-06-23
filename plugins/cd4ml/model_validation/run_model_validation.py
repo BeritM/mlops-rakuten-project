@@ -255,7 +255,7 @@ def main():
             y_test = y_test.reset_index(drop=True)
             y_pred = pd.Series(y_pred, name="y_pred").reset_index(drop=True)
             reference_df_evidently = pd.concat([X_test, y_test, y_pred], axis=1, ignore_index=False)
-            reference_df_evidently = reference_df_evidently.rename({"prdtypecode": "correct_code", "y_pred": "predicted_code"})
+            reference_df_evidently = reference_df_evidently.rename(columns={"prdtypecode": "correct_code", "y_pred": "predicted_code"})
             
 
         # 5. Compare and decide on promotion

@@ -10,7 +10,9 @@ from dvc_push_manager import track_and_push_with_retry
 import threading
 from prometheus_client import generate_latest, Gauge, Counter, Histogram
 from evidently.report import Report
-from evidently.metric_preset import DataDriftPreset, ClassificationPerformancePreset
+from evidently.metric_preset import DataDriftPreset, ClassificationPreset
+from evidently import ColumnMapping
+#from evidently.model_monitoring import PrometheusMetricWriter
 import pandas as pd
 from sklearn.metrics import f1_score
 import threading
@@ -162,6 +164,7 @@ def calculate_and_expose_drift():
 
             required_cols_for_performance = ['predicted_code', 'correct_code']
             current_df_for_performance = current_df.dropna(subset=required_cols_for_performance)
+            print(f"current_df_for_performance: {current_df_for_performance.head()}")
             if current_df_for_performance.empty:
                 print("No valid data with ground truth for performance metrics. Setting performance F1 to 0.")
                 MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
@@ -169,50 +172,50 @@ def calculate_and_expose_drift():
                 current_df_for_performance['correct_code'] = pd.to_numeric(current_df_for_performance['correct_code'], errors='coerce').astype(int)
                 current_df_for_performance['predicted_code'] = pd.to_numeric(current_df_for_performance['predicted_code'], errors='coerce').astype(int)
                 current_df_for_performance.dropna(subset=['correct_code', 'predicted_code'], inplace=True) 
+                print(f"reference_df: {reference_df.columns}")
+                print(reference_df.head())
+                reference_df = reference_df.rename(columns={"prdtypecode": "correct_code", "y_pred": "predicted_code"})
+                reference_df = reference_df[["designation", "description", "correct_code", "predicted_code"]]
+                print(reference_df.head())
+                reference_df.dropna(subset=['correct_code', 'predicted_code'], inplace=True) 
+                reference_df['correct_code'] = pd.to_numeric(reference_df['correct_code'], errors='coerce').astype(int)
+
+
             
             reference_df_for_evidently = reference_df.copy()
             current_df_for_evidently = current_df_for_performance.copy()
             product_dictionary = pd.read_pickle(product_dictionary_path)
             sorted_target_names = [product_dictionary[k] for k in sorted(product_dictionary.keys())]
 
+            print("current_df_for_evidently:")
+            print(current_df_for_evidently.columns)
+            print(current_df_for_evidently.head())
+            print("reference_df_for_evidently")
+            print(reference_df_for_evidently.columns)
+            print(reference_df_for_evidently.head())
             
             # Da wir die F1 von calculate_and_expose_f1 schon haben,
             # könnten wir uns hier auf DataDrift und PredictionDrift konzentrieren
             # und die Performance-Metrik direkt von der anderen Funktion übernehmen ODER
             # Evidently nutzen, um eine konsistentere Metrik zu erhalten.
+            column_mapping = ColumnMapping(
+                target="correct_code",
+                prediction="predicted_code",
+                text_features=["designation", "description"],
+                task="classification"
+            )
+            column_mapping_data_drift = ColumnMapping(
+                target=None,
+                prediction="predicted_code",
+                text_features=["designation", "description"],
+                task="classification"
+            )
             
+            data_drift_report = Report(metrics=[DataDriftPreset()])
+            model_performance_report = Report(metrics=[ClassificationPreset()])
 
-            drift_report = Report(metrics=[
-                DataDriftPreset(
-                    column_mapping={
-                        'target_names': sorted_target_names.keys(), 
-                        'prediction_type': 'classification', 
-                        'target': 'correct_code', 
-                        'prediction': 'predicted_code', 
-                        'text_features': ['designation', 'description'] 
-                    }
-                ),
-                ClassificationPerformancePreset(
-                    column_mapping={
-                        'target_names': sorted_target_names.keys(),
-                        'prediction_type': 'classification',
-                        'target': 'correct_code',
-                        'prediction': 'predicted_code',
-                    }
-                )
-            ])
-
-            # Eine pragmatische Lösung:
-            # 1. Für Data Drift und Prediction Drift: nutze `current_df` (alle Vorhersagen).
-            # 2. Für Classification Performance: nutze `current_df_for_performance` (nur Vorhersagen mit Feedback).
-            # Da Evidently nur einen `current_data` Parameter nimmt, ist es am besten,
-            # zwei separate Reports zu erstellen oder den umfangreicheren Datensatz (`current_df`) zu verwenden
-            # und die `target` Spalte entsprechend zu behandeln (`ClassificationPerformancePreset` ignoriert NaN in `target`).
-
-            # Option 1: DataDrift und PredictionDrift auf allen aktuellen Daten
-            # Option 2: Performance auf den subset der Daten mit Ground Truth
-            # Hier versuchen wir, beides in einem Report zu kombinieren.
-            # Evidently handhabt NaN in der Zielspalte für Performance-Metriken.
+            #report = Report(metrics=[DataDriftPreset(), ClassificationPreset()], include_tests=True)
+                    
 
             # Einfachere Annahme: Evidently kann mit `text_features` direkt umgehen
             # Oder Sie ignorieren `text_features` und prüfen nur Drift in `predicted_code` (Prediction Drift)
@@ -226,18 +229,24 @@ def calculate_and_expose_drift():
             # `reference_df['prediction']` sollte die Modellvorhersagen auf den Referenzdaten sein,
             # `reference_df['correct_code']` die wahren Labels.
 
-            drift_report.run(reference_data=reference_df_for_evidently, current_data=current_df_for_evidently,
-                             column_mapping={
-                                'target': 'correct_code',
-                                'prediction': 'predicted_code',
-                                'text_features': ['designation', 'description'] 
-                             })
+            
+            
+            model_performance_report.run(reference_data=reference_df_for_evidently, 
+                       current_data=current_df_for_evidently,
+                       column_mapping=column_mapping)
+            data_drift_report.run(reference_data=reference_df_for_evidently, 
+                       current_data=current_df_for_evidently,
+                       column_mapping=column_mapping_data_drift)
 
+
+            #report.save_html('evidently_report.html')
+            #writer = PrometheusMetricWriter()
+            #report.save(writer)
 
             # --- Metriken extrahieren und an Prometheus senden ---
 
             # Data Drift
-            data_drift_metric = drift_report.as_dict()['metrics'][0]['result']['dataset_drift']
+            data_drift_metric = data_drift_report.as_dict()['metrics'][0]['result']['dataset_drift']['drift_detected']
             DATA_DRIFT_DETECTED.set(1 if data_drift_metric else 0)
             print(f"Data Drift Detected: {data_drift_metric}")
 
@@ -246,16 +255,16 @@ def calculate_and_expose_drift():
             # Sie müssen in den Evidently-Resultaten suchen, wo der Prediction Drift gemeldet wird.
             # oft ist es unter 'column_names' oder 'prediction_drift'.
             # Beispielhaft:
-            prediction_drift_metric = drift_report.as_dict()['metrics'][0]['result']['drift_by_columns']['predicted_code']['drift_detected']
+            prediction_drift_metric = model_performance_report.as_dict()['metrics'][0]['result']['drift_by_columns']['predicted_code']['drift_detected']
             PREDICTION_DRIFT_DETECTED.set(1 if prediction_drift_metric else 0)
             print(f"Prediction Drift Detected: {prediction_drift_metric}")
 
             # Model Performance F1 (aus ClassificationPerformancePreset)
             # Suchen Sie im Report nach der F1-Score Metrik.
             # Die Struktur kann variieren, daher sorgfältig prüfen:
-            print(json.dumps(drift_report.as_dict(), indent=2)) # Zum Debuggen der Struktur
-            performance_metrics = drift_report.as_dict()['metrics'][1]['result']
-            current_f1_from_evidently = performance_metrics['current']['f1']['weighted'] # Beispielpfad
+            print(json.dumps(data_drift_report.as_dict(), indent=2)) # Zum Debuggen der Struktur
+            performance_metrics = data_drift_report.as_dict()['metrics'][1]['result']['current']
+            current_f1_from_evidently = performance_metrics['f1']['weighted'] # Beispielpfad
             MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(current_f1_from_evidently)
             print(f"Evidently Model Performance F1 (Current): {current_f1_from_evidently}")
 
