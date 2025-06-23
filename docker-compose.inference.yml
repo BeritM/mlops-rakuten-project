@@ -1,8 +1,10 @@
 services:
   dvc-sync:
     build:
-      context: "./dockerfiles/dvc"
-      dockerfile: "Dockerfile"
+      #context: "./dockerfiles/dvc"
+      context: "." ############################### Changed Pathing
+      #dockerfile: "Dockerfile"
+      dockerfile: dockerfiles/dvc/Dockerfile ####################### changed Pathing
     volumes:
       - ./:/workspace
       - dvc-cache:/workspace/.dvc/cache
