@@ -4,11 +4,16 @@ import pathlib
 import joblib
 import mlflow
 from datetime import datetime
+import time
 from typing import Optional
 from dvc_push_manager import track_and_push_with_retry
 import threading
+from prometheus_client import generate_latest, Gauge, Counter, Histogram
+import pandas as pd
+from sklearn.metrics import f1_score
+import threading
 
-from fastapi import FastAPI, Depends, HTTPException, status, Header
+from fastapi import FastAPI, Depends, HTTPException, status, Header, Request, Response
 from pydantic import BaseModel
 from jose import jwt, JWTError
 from mlflow.tracking import MlflowClient
@@ -20,10 +25,119 @@ from dotenv import load_dotenv
 import subprocess
 
 load_dotenv()
+# --------------------------------
+# PROMETHEUS implementation
+# --------------------------------
+
+# Prometheus Gauge for F1-Score
+PREDICTION_F1_SCORE = Gauge(
+    'prediction_f1_score',
+    'F1 score of the prediction service based on feedback data'
+)
+
+# Prometheus Counter for prediction requests
+PREDICTION_REQUESTS_TOTAL = Counter(
+    'prediction_requests_total',
+    'Total number of prediction requests to the predict service',
+    ['method', 'endpoint', 'status_code']  # Added status_code
+)
+
+# Prometheus Histogram for prediction latency
+PREDICTION_LATENCY = Histogram(
+    'prediction_latency_seconds',
+    'Latency of prediction requests in seconds',
+    ['method', 'endpoint']
+)
+
+def calculate_and_expose_f1():
+    while True:
+        try:
+            if not os.path.exists(FEEDBACK_CSV_PATH):
+                print(f"Feedback file not found at {FEEDBACK_CSV_PATH}. Setting F1 to 0.")
+                PREDICTION_F1_SCORE.set(0)
+                time.sleep(60) 
+                continue
+
+            df = pd.read_csv(FEEDBACK_CSV_PATH)
+
+            required_columns = ['correct_code', 'predicted_code']
+            if not all(col in df.columns for col in required_columns):
+                print("Feedback file is missing 'correct_code' or 'predicted_code' columns. Setting F1 to 0.")
+                PREDICTION_F1_SCORE.set(0)
+                time.sleep(300)
+                continue
+
+            df['correct_code'] = pd.to_numeric(df['correct_code'], errors='coerce')
+            df['predicted_code'] = pd.to_numeric(df['predicted_code'], errors='coerce')
+            df_filtered = df.dropna(subset=['correct_code', 'predicted_code'])
+
+            if df_filtered.empty:
+                print("No valid feedback data (correct_code/predicted_code) available after filtering for F1 calculation. Setting F1 to 0.")
+                PREDICTION_F1_SCORE.set(0)
+            else:
+                true_labels = df_filtered['correct_code'].astype(int)
+                predicted_labels = df_filtered['predicted_code'].astype(int)
+
+                if len(true_labels.unique()) == 1 and len(predicted_labels.unique()) == 1 and true_labels.unique()[0] == predicted_labels.unique()[0]:
+                     f1 = f1_score(true_labels, predicted_labels, average='weighted')
+                elif len(true_labels.unique()) < 2 or len(predicted_labels.unique()) < 2:
+                    print("Filtered feedback data contains less than two unique classes. F1 score might be misleading or invalid. Setting F1 to 0.")
+                    PREDICTION_F1_SCORE.set(0)
+                else:
+                    f1 = f1_score(true_labels, predicted_labels, average='weighted')
+                    PREDICTION_F1_SCORE.set(f1)
+                    print(f"Calculated F1 Score: {f1}")
+
+        except pd.errors.EmptyDataError:
+            print(f"Feedback file {FEEDBACK_CSV_PATH} is empty. Setting F1 to 0.")
+            PREDICTION_F1_SCORE.set(0)
+        except Exception as e:
+            print(f"Error calculating F1 score: {e}")
+            print("Full traceback:", traceback.format_exc()) 
+            PREDICTION_F1_SCORE.set(0)
+        time.sleep(300)
 
 
-# --- FastAPI App ---
+#def calculate_and_expose_f1():
+#    while True:
+#        try:
+#            df = pd.read_csv(FEEDBACK_CSV_PATH)
+#            if not df.empty and 'correct_code' in df.columns and 'predicted_code' in df.columns:
+#                f1 = f1_score(df['correct_code'], df['predicted_code'], average='weighted') 
+#                PREDICTION_F1_SCORE.set(f1)
+#                print(f"Calculated F1 Score: {f1}")
+#            else:
+#                print("Feedback file is empty or missing required columns.")
+#                PREDICTION_F1_SCORE.set(0) 
+#        except FileNotFoundError:
+#            print(f"Feedback file not found at {FEEDBACK_CSV_PATH}. F1 score not available.")
+#            PREDICTION_F1_SCORE.set(0) 
+#        except Exception as e:
+#            print(f"Error calculating F1 score: {e}")
+#            PREDICTION_F1_SCORE.set(0) 
+#        time.sleep(300) 
+
+# --------------------------------
+# FastAPI App 
+# --------------------------------
 predict_app = FastAPI()
+
+# --- Middleware for request counting and latency ---
+@predict_app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+
+    PREDICTION_REQUESTS_TOTAL.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status_code=response.status_code,
+    ).inc()
+    PREDICTION_LATENCY.labels(method=request.method, endpoint=request.url.path).observe(
+        process_time
+    )
+    return response
 
 # --- Auth Config ---
 SECRET_KEY = "your_secret_key_here"
@@ -153,6 +267,11 @@ def startup():
 
         print("[INFO] Predict service startup complete.")
 
+        # Start the F1 score calculation thread
+        f1_thread = threading.Thread(target=calculate_and_expose_f1, daemon=True)
+        f1_thread.start()
+        print("F1 score calculation thread started.")
+
     except Exception as e:
         print(f"[ERROR] Failed during startup: {e}")
         raise RuntimeError("Predict service startup failed. See logs for details.")
@@ -179,10 +298,12 @@ def get_model_info(user=Depends(verify_token)):
     }
 
 @predict_app.post("/predict", response_model=PredictionResponse)
-def predict_product_type(request: PredictionRequest, user=Depends(verify_token)):
+def predict_product_type(request: PredictionRequest, user=Depends(verify_token), fastapi_request: Request = None):
+    start_time = time.time()
     username = user.get("sub")
     prediction = predictor.predict(request.designation, request.description)
     predicted_code = label_to_code.get(prediction, "UNKNOWN")
+    latency = time.time() - start_time
 
     # Create unique session_id for tracking this prediction
     session_id = f"{username}_{datetime.now().timestamp()}"
@@ -257,16 +378,8 @@ def submit_feedback(input: FeedbackInput, user=Depends(verify_token)):
 
     return {"status": "success", "message": "Feedback recorded."}
 
-#@predict_app.post("/start-retraining")
-#def start_retraining(user=Depends(verify_token)):
-#    username = user.get("sub")
-#    if not username or username != "admin":
-#        raise HTTPException(status_code=401, detail="Unauthorized user")
-#    try:
-#        result = subprocess.run([
-#            "docker-compose", "up", "--build", "--detach",
-#            "dvc-sync", "preprocessing", "model_training", "model_validation"
-#            ], capture_output=True, text=True, check=True)
-#        return {"status": "success", "output": result.stdout}
-#    except subprocess.CalledProcessError as e:
-#        return {"status": "error", "error": e.stderr}
+# --- Metrics Endpoint ---
+@predict_app.get("/metrics")
+async def metrics():
+    return Response(content=generate_latest(), media_type="text/plain; version=0.0.4; charset=utf-8")
+
