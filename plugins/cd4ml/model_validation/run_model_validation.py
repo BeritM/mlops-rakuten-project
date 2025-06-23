@@ -7,6 +7,8 @@ Updated version with improved DVC push logic and better error handling.
 import sys
 import os
 import mlflow
+import pandas as pd
+import pickle
 from mlflow.tracking import MlflowClient
 
 # Import the improved DVC push manager
@@ -18,10 +20,12 @@ from plugins.cd4ml.model_training.model_training import load_train_data
 # ---------- Paths ----------
 INPUT_DIR  = os.getenv("DATA_PROCESSED_DIR")
 OUTPUT_DIR = os.getenv("MODEL_DIR")
+X_TEST_PATH = os.path.join(INPUT_DIR, os.getenv("X_TEST"))
 X_TEST_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_TEST_TFIDF"))
 Y_TEST_PATH       = os.path.join(INPUT_DIR, os.getenv("Y_TEST"))
 MODEL_FILE        = os.getenv("MODEL")
 CLASS_REPORT_PATH = os.path.join(OUTPUT_DIR, os.getenv("CLASS_REPORT_VALIDATION"))
+REFERENCE_EVIDENTLY_PATH = os.path.join(OUTPUT_DIR, os.getenv("REFERENCE_EVIDENTLY"))
 
 # ---------- Dagshub ----------
 DAGSHUB_USER_NAME = os.getenv("DAGSHUB_USER_NAME")
@@ -37,7 +41,7 @@ def validate_environment():
     """Validate that all required environment variables are set."""
     required_vars = [
         "DATA_PROCESSED_DIR", "MODEL_DIR", "MODEL", "CLASS_REPORT_VALIDATION",
-        "X_TEST_TFIDF", "Y_TEST",
+        "X_TEST", "X_TEST_TFIDF", "Y_TEST", "REFERENCE_EVIDENTLY",
         "DAGSHUB_USER_NAME", "DAGSHUB_USER_TOKEN", "DAGSHUB_REPO_OWNER", "DAGSHUB_REPO_NAME"
     ]
     
@@ -50,9 +54,11 @@ def validate_environment():
 def validate_input_files():
     """Validate that all required input files exist."""
     required_files = {
+        "X_test": X_TEST_PATH,
         "X_test_tfidf": X_TEST_TFIDF_PATH,
         "y_test": Y_TEST_PATH,
-        "current_run_id": os.path.join(OUTPUT_DIR, "current_run_id.txt")
+        "current_run_id": os.path.join(OUTPUT_DIR, "current_run_id.txt"),
+        #"reference_df_evidently": REFERENCE_EVIDENTLY_PATH,
     }
     
     missing_files = []
@@ -102,27 +108,6 @@ def get_production_model_performance(client):
             print(f"[ERROR] Production model F1 score not found in metrics")
         
         return prod_f1, prod_run_id
-
-        #latest_prod = client.get_latest_versions("SGDClassifier_Model", stages=["Production"])
-        
-        #if not latest_prod:
-        #    print("No production model found.")
-        #    return None, None
-        
-        #prod_version = latest_prod[0]
-        #prod_run_id = prod_version.run_id
-        #print(f"Current production model: version {prod_version.version}, run_id: {prod_run_id}")
-        
-        # Get production model performance
-        #prod_run = client.get_run(prod_run_id)
-        #prod_f1 = prod_run.data.metrics.get("f1_weighted")
-        
-        #if prod_f1 is not None:
-        #    print(f"Production model F1 score: {prod_f1:.4f}")
-        #else:
-        #    print("Production model F1 score not found in metrics")
-        
-        #return prod_f1, prod_run_id
         
     except Exception as e:
         print(f"[ERROR] Error retrieving production model: {e}")
@@ -159,7 +144,7 @@ def validate_and_test_model(client, new_run_id):
     print(f"Test labels distribution:\n{y_test.value_counts().head()}")
     
     print("Running model validation...")
-    val_acc, val_f1, class_report = prediction_and_metrics(X_test_tfidf, y_test, latest_model)
+    val_acc, val_f1, class_report, y_pred = prediction_and_metrics(X_test_tfidf, y_test, latest_model)
     
     print(f"Validation accuracy: {val_acc:.4f}")
     print(f"Validation F1 (weighted): {val_f1:.4f}")
@@ -169,7 +154,7 @@ def validate_and_test_model(client, new_run_id):
     #report_path = save_txt_file(OUTPUT_DIR, report_filename, classification_repo)
     #print(f"Classification report saved to: {report_path}")
     
-    return val_acc, val_f1, class_report, latest_model
+    return val_acc, val_f1, class_report, latest_model, y_pred
 
 def promote_model_if_better(client, new_run_id, new_f1, prod_f1):
     """Promote the new model to production if it performs better."""
@@ -255,7 +240,23 @@ def main():
 
         # 4. Validate and test the new model
         print("\n4. Validating new model...")
-        val_acc, val_f1, class_report, latest_model = validate_and_test_model(client, new_run_id)
+        val_acc, val_f1, class_report, latest_model, y_pred = validate_and_test_model(client, new_run_id)
+
+        # 4.1 Create or load reference data for evidently
+        print("Load or create reference dataframe for evidently")
+        try:
+            reference_df_evidently = pd.read_csv(REFERENCE_EVIDENTLY_PATH)
+            print("Found reference file for evidently")
+        except FileNotFoundError:
+            print("Reference data for evidently not found. Create dataframe")
+            X_test = pd.read_csv(X_TEST_PATH).drop(["productid", "imageid"], axis=1).reset_index(drop=True)
+            with open(Y_TEST_PATH, "rb") as f:
+                y_test = pickle.load(f)
+            y_test = y_test.reset_index(drop=True)
+            y_pred = pd.Series(y_pred, name="y_pred").reset_index(drop=True)
+            reference_df_evidently = pd.concat([X_test, y_test, y_pred], axis=1, ignore_index=False)
+            reference_df_evidently = reference_df_evidently.rename({"prdtypecode": "correct_code", "y_pred": "predicted_code"})
+            
 
         # 5. Compare and decide on promotion
         print("\n5. Model promotion decision...")
@@ -269,16 +270,19 @@ def main():
                 f.write(class_report)
             print(f"Classification report saved to: {CLASS_REPORT_PATH}")
 
+            reference_df_evidently.to_csv(REFERENCE_EVIDENTLY_PATH, index=False)
+
+            #with open(REFERENCE_EVIDENTLY_PATH, "w") as f:
+            #    f.write(reference_df_evidently)
+
             mlflow.log_metric("test_accuracy", val_acc)
             mlflow.log_metric("test_f1_weighted", val_f1)
             mlflow.log_param("promoted_to_production", promoted)
             mlflow.log_param("promotion_reason", reason)
             
-            # Log the test classification report
-            #report_path = os.path.join(OUTPUT_DIR, f"classification_report_{MODEL_FILE}.txt")
-            #if os.path.exists(report_path):
-                #mlflow.log_artifact(report_path, "test_reports")
+            # Log the test classification report and reference dataframe for evidently
             mlflow.log_artifact(CLASS_REPORT_PATH, artifact_path="classification_report")
+            mlflow.log_artifact(REFERENCE_EVIDENTLY_PATH, artifact_path="monitoring_data")
 
         # Summary
         print("\n" + "=" * 60)

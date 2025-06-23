@@ -121,9 +121,9 @@ def main():
             print(f"Loaded existing combined raw data from {X_Y_RAW_PATH} with shape: {df.shape}")
 
         # 1.b Combine with feedback data if available
-        df = combine_feedback_raw(FEEDBACK_PATH, df_raw=df, save_path=RETRAIN_RAW_PATH)
-        print(f"Combined dataset shape after feedback: {df.shape}")
-        print(df.info())
+        #df = combine_feedback_raw(FEEDBACK_PATH, df_raw=df, save_path=RETRAIN_RAW_PATH)
+        #print(f"Combined dataset shape after feedback: {df.shape}")
+        #print(df.info())
 
         # 2. Clean text
         print("\n2. Cleaning text data...")
