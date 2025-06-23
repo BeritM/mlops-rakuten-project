@@ -21,9 +21,21 @@ __pycache__/
 # env
 .env
 /model.joblibenv
-env
+env*
 venv
 my_env
 /data/
 /models/
 /models
+.vscode/
+
+# airflow
+logs/
+airflow-*.pid
+airflow-webserver.pid
+airflow.db
+airflow.cfg
+
+# personal
+*personal
+*00*

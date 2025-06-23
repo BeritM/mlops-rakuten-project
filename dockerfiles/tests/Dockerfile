@@ -2,21 +2,23 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git curl gosu \
+  && rm -rf /var/lib/apt/lists/*
 
-# Copy & install requirements
+# Git safe directory configuration (important for DVC related tests if applicable)
+#RUN git config --global --add safe.directory /app && \
+#    git config --global --add safe.directory '*'
+
 COPY dockerfiles/tests/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install additional dependencies for testing
 RUN pip install --no-cache-dir requests
 
-# Copy entire project
+COPY dockerfiles/tests/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 COPY . .
 
-# Command
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["pytest", "plugins/cd4ml/tests/test_predict_service.py", "-v", "-rA"]

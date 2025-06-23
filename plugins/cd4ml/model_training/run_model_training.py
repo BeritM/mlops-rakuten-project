@@ -26,16 +26,16 @@ DAGSHUB_REPO_NAME  = os.getenv("DAGSHUB_REPO_NAME")
 # ---------- Paths ----------
 INPUT_DIR  = os.getenv("DATA_PROCESSED_DIR")
 OUTPUT_DIR = os.getenv("MODEL_DIR")
-X_TRAIN_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_TRAIN_TFIDF"))
-Y_TRAIN_PATH = os.path.join(INPUT_DIR, os.getenv("Y_TRAIN"))
-X_VALIDATE_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_VALIDATE_TFIDF"))
-Y_VALIDATE_PATH = os.path.join(INPUT_DIR, os.getenv("Y_VALIDATE"))
-MODEL_PATH = os.path.join(OUTPUT_DIR, os.getenv("MODEL"))
-CLASS_REPORT_PATH = os.path.join(OUTPUT_DIR, "CLASS_REPORT")
-VECTORIZER_PATH = os.path.join(OUTPUT_DIR, os.getenv("TFIDF_VECTORIZER"))
-PRODUCT_DICTIONARY_PATH = os.path.join(OUTPUT_DIR, os.getenv("PRODUCT_DICTIONARY"))
+X_TRAIN_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_TRAIN_TFIDF")) # type: ignore
+Y_TRAIN_PATH = os.path.join(INPUT_DIR, os.getenv("Y_TRAIN")) # type: ignore
+X_VALIDATE_TFIDF_PATH = os.path.join(INPUT_DIR, os.getenv("X_VALIDATE_TFIDF")) # type: ignore
+Y_VALIDATE_PATH = os.path.join(INPUT_DIR, os.getenv("Y_VALIDATE")) # type: ignore
+MODEL_PATH = os.path.join(OUTPUT_DIR, os.getenv("MODEL")) # type: ignore
+CLASS_REPORT_PATH = os.path.join(OUTPUT_DIR, os.getenv("CLASS_REPORT")) # type: ignore
+VECTORIZER_PATH = os.path.join(OUTPUT_DIR, os.getenv("TFIDF_VECTORIZER")) # type: ignore
+PRODUCT_DICTIONARY_PATH = os.path.join(OUTPUT_DIR, os.getenv("PRODUCT_DICTIONARY")) # type: ignore
 PARAM_CONFIG_PATH = os.getenv("PARAM_CONFIG")
-RUN_ID_PATH = os.path.join(OUTPUT_DIR, os.getenv("CURRENT_RUN_ID"))
+RUN_ID_PATH = os.path.join(OUTPUT_DIR, os.getenv("CURRENT_RUN_ID")) # type: ignore
 
 def validate_environment():
     """Validate that all required environment variables are set."""
@@ -51,7 +51,7 @@ def validate_environment():
         raise ValueError(f"Missing required environment variables: {missing_vars}")
     
     # Create output directory if it doesn't exist
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(OUTPUT_DIR, exist_ok=True) # type: ignore
     print(f"Ensured output directory exists: {OUTPUT_DIR}")
 
 def validate_input_files():
@@ -76,14 +76,14 @@ def validate_input_files():
 def load_config(filename=PARAM_CONFIG_PATH):
     """Load configuration from YAML file."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, filename)
+    config_path = os.path.join(script_dir, filename) # type: ignore
     
     if not os.path.exists(config_path):
         # Try alternative locations
         alt_paths = [
             filename,  # Current directory
-            os.path.join(os.getcwd(), filename),  # Working directory
-            os.path.join(os.getcwd(), "config", filename)  # Config subdirectory
+            os.path.join(os.getcwd(), filename),  # Working directory # type: ignore
+            os.path.join(os.getcwd(), "config", filename)  # Config subdirectory # type: ignore
         ]
         
         for alt_path in alt_paths:
@@ -208,9 +208,9 @@ def main():
             print(f"Run ID saved to: {RUN_ID_PATH}")
 
         ## 6. Save model locally
-        #print("\n6. Saving model locally...")
-        #joblib.dump(model, MODEL_PATH)
-        #print(f"Model saved to: {MODEL_PATH}")
+        print("\n6. Saving model locally...")
+        joblib.dump(model, MODEL_PATH)
+        print(f"Model saved to: {MODEL_PATH}")
         
         # Summary
         print("\n" + "=" * 60)

@@ -15,7 +15,7 @@ __pycache__/
 
 
 # Git directory and gitignore
-.git/
+#.git/
 .gitignore
 .gitkeep
 git-workflow.md
@@ -47,8 +47,18 @@ READ_ME_FOR_DVC.md
 # folders
 notebooks
 models
-logs
+logs/
 docs
 data
-dags
+monitoring/
+#dags
+
+# Other
+ui_app.py
+git-workflow.md
+main.py
+READ_ME_FOR AIRFLOW.md
+READ_ME_drift.md
+
+
 
