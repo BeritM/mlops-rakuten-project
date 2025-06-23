@@ -1,11 +1,6 @@
 outs:
-<<<<<<< HEAD
 - md5: 96da213703f1d60706a6054c56fbdace.dir
   size: 4283
-=======
-- md5: 1274236ddf23d358c3760437ed83df9f.dir
-  size: 2877
->>>>>>> ba8dae53665dbed9f26dfb99bf70f82bd4c3eeb3
   nfiles: 2
   hash: md5
   path: feedback
