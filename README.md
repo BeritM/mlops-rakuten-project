@@ -202,7 +202,7 @@ The helper script `dvc_push_manager.py` automates *DVC ➜ Git* synchronisatio
 
 ---
 
-## Monitoring & Observability
+## Monitoring & Observability - To Be Adjusted!
 
 | Aspect                 | Current State                                 |
 | ---------------------- | --------------------------------------------- |
@@ -222,11 +222,25 @@ The helper script `dvc_push_manager.py` automates *DVC ➜ Git* synchronisatio
 
 ---
 
-## Testing & CI/CD
+## CI/CD & Testing
 
-* GitHub Actions matrix runs on every PR and pushes status badges.
-* Unit & integration tests (`pytest`) cover preprocessing, training pipeline and API routes.
-* A dedicated *tests* container spins up `auth_service` + `predict_service`, waits for health checks and validates the full request‑flow.
+A **single GitHub Actions workflow** (`.github/workflows/docker-publish.yml`) runs on each push / PR to **`main`**, **`develop`** or the dedicated feature branch.
+
+| Stage                   | What happens?                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **CodeQL Scan**         | Static code‑ & security‑analysis for Python.                                                                           |
+| **Pytest**              | Runs unit tests for preprocessing & training *and* integration tests for API routes (via the dedicated `tests` image). |
+| **Docker Build + Push** | Matrix builds *all* service images (dvc‑sync, preprocessing, training …) with Buildx and pushes them to Docker Hub.    |
+| **Compose Build Check** | Verifies that the full `docker‑compose.yml` still builds end‑to‑end (no containers started).                           |
+
+**Workflow Highlights**
+
+* Layer‑caching and pip‑caching speed up builds.
+* The `tests` container spins up **auth\_service + predict\_service**, waits for health checks and runs full request‑flow tests.
+* Concurrency guard cancels redundant runs on the same branch.
+* Docker Hub creds are injected via GitHub Secrets.
+
+A green check‑mark in GitHub shows the pipeline passed.
 
 ---
 
@@ -265,7 +279,7 @@ streamlit run ui_app.py --server.port 8501
 
 ## License
 
-© 2025 Rakuten MLOps Project Team
+Licensed by the Rakuten Institute of Technology.
 
 ---
 
@@ -275,6 +289,5 @@ streamlit run ui_app.py --server.port 8501
 * Anomalisaa
 * SebastianPoppitz
 * Tubetraveller
-
 
 
