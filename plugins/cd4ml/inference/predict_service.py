@@ -9,9 +9,13 @@ from typing import Optional
 from dvc_push_manager import track_and_push_with_retry
 import threading
 from prometheus_client import generate_latest, Gauge, Counter, Histogram
+from evidently.report import Report
+from evidently.metric_preset import DataDriftPreset, ClassificationPerformancePreset
 import pandas as pd
 from sklearn.metrics import f1_score
 import threading
+import json
+import traceback
 
 from fastapi import FastAPI, Depends, HTTPException, status, Header, Request, Response
 from pydantic import BaseModel
@@ -49,6 +53,24 @@ PREDICTION_LATENCY = Histogram(
     ['method', 'endpoint']
 )
 
+# Data drift monitoring
+DATA_DRIFT_DETECTED = Gauge(
+    'data_drift_detected',
+    'Indicates if data drift was detected (1 if detected, 0 otherwise)'
+)
+
+# Predictin drift monitoring
+PREDICTION_DRIFT_DETECTED = Gauge(
+    'prediction_drift_detected',
+    'Indicates if prediction drift was detected (1 if detected, 0 otherwise)'
+)
+
+# Model performance monitoring
+MODEL_PERFORMANCE_F1_SCORE_CURRENT = Gauge(
+    'model_performance_f1_score_current',
+    'F1 score of the current model on recent feedback data with ground truth'
+)
+
 def calculate_and_expose_f1():
     while True:
         try:
@@ -79,7 +101,9 @@ def calculate_and_expose_f1():
                 predicted_labels = df_filtered['predicted_code'].astype(int)
 
                 if len(true_labels.unique()) == 1 and len(predicted_labels.unique()) == 1 and true_labels.unique()[0] == predicted_labels.unique()[0]:
-                     f1 = f1_score(true_labels, predicted_labels, average='weighted')
+                     f1 = f1_score(true_labels, predicted_labels, average='weighted', zero_division=0)
+                     PREDICTION_F1_SCORE.set(0)
+                     print(f"Calculated F1 Score: {f1}")
                 elif len(true_labels.unique()) < 2 or len(predicted_labels.unique()) < 2:
                     print("Filtered feedback data contains less than two unique classes. F1 score might be misleading or invalid. Setting F1 to 0.")
                     PREDICTION_F1_SCORE.set(0)
@@ -97,25 +121,157 @@ def calculate_and_expose_f1():
             PREDICTION_F1_SCORE.set(0)
         time.sleep(300)
 
+def calculate_and_expose_drift():
+    #global reference_df
 
-#def calculate_and_expose_f1():
-#    while True:
-#        try:
-#            df = pd.read_csv(FEEDBACK_CSV_PATH)
-#            if not df.empty and 'correct_code' in df.columns and 'predicted_code' in df.columns:
-#                f1 = f1_score(df['correct_code'], df['predicted_code'], average='weighted') 
-#                PREDICTION_F1_SCORE.set(f1)
-#                print(f"Calculated F1 Score: {f1}")
-#            else:
-#                print("Feedback file is empty or missing required columns.")
-#                PREDICTION_F1_SCORE.set(0) 
-#        except FileNotFoundError:
-#            print(f"Feedback file not found at {FEEDBACK_CSV_PATH}. F1 score not available.")
-#            PREDICTION_F1_SCORE.set(0) 
-#        except Exception as e:
-#            print(f"Error calculating F1 score: {e}")
-#            PREDICTION_F1_SCORE.set(0) 
-#        time.sleep(300) 
+    # Initiales Laden des Referenzdatensatzes
+    # Dies sollte nur einmal beim Start passieren oder wenn ein neues Modell bereitgestellt wird.
+    # Wenn Sie den Referenzdatensatz aus MLflow laden möchten, tun Sie dies hier.
+    # Für Einfachheit nehmen wir an, er ist über einen DVC-Sync oder manuell im Container verfügbar.
+    try:
+        if not os.path.exists(REFERENCE_DF_PATH):
+            print(f"[ERROR] Reference data not found at {REFERENCE_DF_PATH}. Drift monitoring will not function.")
+            reference_df = None 
+        else:
+            reference_df = pd.read_csv(REFERENCE_DF_PATH)
+            print(f"[INFO] Loaded reference data for Evidently from {REFERENCE_DF_PATH}.")
+    except Exception as e:
+        print(f"[ERROR] Failed to load reference data for Evidently: {e}")
+        reference_df = None
+
+    while True:
+        try:
+            if reference_df is None:
+                print("Skipping drift calculation: Reference data not loaded.")
+                DATA_DRIFT_DETECTED.set(0) 
+                PREDICTION_DRIFT_DETECTED.set(0)
+                MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+                time.sleep(300)
+                continue
+
+            if not os.path.exists(FEEDBACK_CSV_PATH):
+                print(f"Feedback file not found at {FEEDBACK_CSV_PATH}. Skipping drift calculation.")
+                DATA_DRIFT_DETECTED.set(0)
+                PREDICTION_DRIFT_DETECTED.set(0)
+                MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+                time.sleep(300)
+                continue
+
+            feedback_df = pd.read_csv(FEEDBACK_CSV_PATH)
+            current_df = feedback_df[["designation", "description", "correct_code", "predicted_code"]]
+
+            required_cols_for_performance = ['predicted_code', 'correct_code']
+            current_df_for_performance = current_df.dropna(subset=required_cols_for_performance)
+            if current_df_for_performance.empty:
+                print("No valid data with ground truth for performance metrics. Setting performance F1 to 0.")
+                MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+            else:
+                current_df_for_performance['correct_code'] = pd.to_numeric(current_df_for_performance['correct_code'], errors='coerce').astype(int)
+                current_df_for_performance['predicted_code'] = pd.to_numeric(current_df_for_performance['predicted_code'], errors='coerce').astype(int)
+                current_df_for_performance.dropna(subset=['correct_code', 'predicted_code'], inplace=True) 
+            
+            reference_df_for_evidently = reference_df.copy()
+            current_df_for_evidently = current_df_for_performance.copy()
+            product_dictionary = pd.read_pickle(product_dictionary_path)
+            sorted_target_names = [product_dictionary[k] for k in sorted(product_dictionary.keys())]
+
+            
+            # Da wir die F1 von calculate_and_expose_f1 schon haben,
+            # könnten wir uns hier auf DataDrift und PredictionDrift konzentrieren
+            # und die Performance-Metrik direkt von der anderen Funktion übernehmen ODER
+            # Evidently nutzen, um eine konsistentere Metrik zu erhalten.
+            
+
+            drift_report = Report(metrics=[
+                DataDriftPreset(
+                    column_mapping={
+                        'target_names': sorted_target_names.keys(), 
+                        'prediction_type': 'classification', 
+                        'target': 'correct_code', 
+                        'prediction': 'predicted_code', 
+                        'text_features': ['designation', 'description'] 
+                    }
+                ),
+                ClassificationPerformancePreset(
+                    column_mapping={
+                        'target_names': sorted_target_names.keys(),
+                        'prediction_type': 'classification',
+                        'target': 'correct_code',
+                        'prediction': 'predicted_code',
+                    }
+                )
+            ])
+
+            # Eine pragmatische Lösung:
+            # 1. Für Data Drift und Prediction Drift: nutze `current_df` (alle Vorhersagen).
+            # 2. Für Classification Performance: nutze `current_df_for_performance` (nur Vorhersagen mit Feedback).
+            # Da Evidently nur einen `current_data` Parameter nimmt, ist es am besten,
+            # zwei separate Reports zu erstellen oder den umfangreicheren Datensatz (`current_df`) zu verwenden
+            # und die `target` Spalte entsprechend zu behandeln (`ClassificationPerformancePreset` ignoriert NaN in `target`).
+
+            # Option 1: DataDrift und PredictionDrift auf allen aktuellen Daten
+            # Option 2: Performance auf den subset der Daten mit Ground Truth
+            # Hier versuchen wir, beides in einem Report zu kombinieren.
+            # Evidently handhabt NaN in der Zielspalte für Performance-Metriken.
+
+            # Einfachere Annahme: Evidently kann mit `text_features` direkt umgehen
+            # Oder Sie ignorieren `text_features` und prüfen nur Drift in `predicted_code` (Prediction Drift)
+            # und `correct_code` (Target Drift, falls relevant) und Performance.
+
+            # Führen Sie den Report aus
+            # `reference_df` ist der Referenzdatensatz
+            # `current_df` ist der aktuelle Datensatz (Ihr feedback.csv)
+            # Evidently behandelt fehlende `target`-Werte in `current_data` beim Performance-Preset.
+            # Stellen Sie sicher, dass `reference_df` immer `prediction` und `correct_code` hat.
+            # `reference_df['prediction']` sollte die Modellvorhersagen auf den Referenzdaten sein,
+            # `reference_df['correct_code']` die wahren Labels.
+
+            drift_report.run(reference_data=reference_df_for_evidently, current_data=current_df_for_evidently,
+                             column_mapping={
+                                'target': 'correct_code',
+                                'prediction': 'predicted_code',
+                                'text_features': ['designation', 'description'] 
+                             })
+
+
+            # --- Metriken extrahieren und an Prometheus senden ---
+
+            # Data Drift
+            data_drift_metric = drift_report.as_dict()['metrics'][0]['result']['dataset_drift']
+            DATA_DRIFT_DETECTED.set(1 if data_drift_metric else 0)
+            print(f"Data Drift Detected: {data_drift_metric}")
+
+            # Prediction Drift (ist Teil von DataDriftPreset, wenn prediction als Feature betrachtet wird,
+            # oder wenn 'prediction' explizit als Target oder Prediction Mapping gegeben ist)
+            # Sie müssen in den Evidently-Resultaten suchen, wo der Prediction Drift gemeldet wird.
+            # oft ist es unter 'column_names' oder 'prediction_drift'.
+            # Beispielhaft:
+            prediction_drift_metric = drift_report.as_dict()['metrics'][0]['result']['drift_by_columns']['predicted_code']['drift_detected']
+            PREDICTION_DRIFT_DETECTED.set(1 if prediction_drift_metric else 0)
+            print(f"Prediction Drift Detected: {prediction_drift_metric}")
+
+            # Model Performance F1 (aus ClassificationPerformancePreset)
+            # Suchen Sie im Report nach der F1-Score Metrik.
+            # Die Struktur kann variieren, daher sorgfältig prüfen:
+            print(json.dumps(drift_report.as_dict(), indent=2)) # Zum Debuggen der Struktur
+            performance_metrics = drift_report.as_dict()['metrics'][1]['result']
+            current_f1_from_evidently = performance_metrics['current']['f1']['weighted'] # Beispielpfad
+            MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(current_f1_from_evidently)
+            print(f"Evidently Model Performance F1 (Current): {current_f1_from_evidently}")
+
+
+        except Exception as e:
+            print(f"[ERROR] Error calculating drift with Evidently: {e}")
+            # Setzen Sie die Metriken auf Null oder einen Fehlerwert im Fehlerfall
+            DATA_DRIFT_DETECTED.set(0)
+            PREDICTION_DRIFT_DETECTED.set(0)
+            MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+            traceback.print_exc() # Für detaillierteres Debugging
+
+        # Warten, bis die nächste Drift-Berechnung fällig ist (z.B. alle 15 Minuten)
+        time.sleep(900) # 15 Minuten
+
+
 
 # --------------------------------
 # FastAPI App 
@@ -197,6 +353,7 @@ class FeedbackInput(BaseModel):
 def startup():
     global FEEDBACK_CSV_PATH, predictor, prod_model_version
     global model_params, model_metrics, label_to_code, valid_labels, CSV_LOCK_PATH
+    global REFERENCE_DF_PATH, product_dictionary_path
 
     # Load environment variables
     feedback_dir = os.getenv("DATA_FEEDBACK_DIR")
@@ -246,6 +403,11 @@ def startup():
         # vectorizer_path = "/app/models/tfidf_vectorizer.pkl"
         print(f"[INFO] Using remote vectorizer: {vectorizer_path}")
 
+        print(f"[INFO] Downloading reference data for evidently")
+        reference_df_dir = client.download_artifacts(run_id=run_id, path="monitoring_data")
+        REFERENCE_DF_PATH = os.path.join(reference_df_dir, "reference_df_evidently.csv")
+        print(f"[INFO] Reference data path: {REFERENCE_DF_PATH}")
+
         print(f"[DEBUG] Downloading product dictionary...")
         product_dict_dir = client.download_artifacts(run_id=run_id, path="product_dictionary")
         product_dictionary_path = os.path.join(product_dict_dir, "product_dictionary.pkl")
@@ -270,7 +432,12 @@ def startup():
         # Start the F1 score calculation thread
         f1_thread = threading.Thread(target=calculate_and_expose_f1, daemon=True)
         f1_thread.start()
-        print("F1 score calculation thread started.")
+        print("[INFO] F1 score calculation thread started.")
+
+        # Start the drift monitoring thread
+        drift_thread = threading.Thread(target=calculate_and_expose_drift, daemon=True)
+        drift_thread.start()
+        print("Drift monitoring thread started.")
 
     except Exception as e:
         print(f"[ERROR] Failed during startup: {e}")
