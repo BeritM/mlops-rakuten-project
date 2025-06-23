@@ -1,5 +1,9 @@
 name: Pytest, Build & Push Single Docker Services, and Docker Compose Build
 
+# This workflow runs CodeQL, Pytest, builds and pushes Docker images for various services (via a matrix),
+# and checks Docker Compose builds (via a matrix) without running containers.
+# It is triggered on pushes or pull requests to the main, develop, or dev_new-feature-githubactions branches.
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -11,6 +15,7 @@ on:
     branches: [ main, develop, dev_new-feature-githubactions ]
 
 env:
+  # Docker Hub namespace
   REGISTRY: docker.io
   IMAGE_PREFIX: igurstein/rakuten_dev
 
@@ -35,16 +40,22 @@ jobs:
             build-mode: none
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+
       - if: matrix.build-mode == 'manual'
+        shell: bash
         run: |
           echo 'Du hast build-mode="manual" gewählt – hier die Kommandos zum Bauen einfügen'
           exit 1
-      - uses: github/codeql-action/analyze@v3
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
 
@@ -57,27 +68,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Cache pip dependencies
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/requirements-dev.txt', 'plugins/cd4ml/tests/requirements-dev.txt') }}
-          restore-keys: ${{ runner.os }}-pip-
-      - uses: actions/setup-python@v4
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - run: |
+
+      - name: Install Python dependencies
+        run: |
           python -m pip install --upgrade pip
-          pip install pytest pandas numpy pyyaml nltk mlflow
+          pip install pytest
+          pip install pandas numpy pyyaml nltk mlflow
+          # Download NLTK stopwords
           python -c "import nltk; nltk.download('stopwords')"
-          for f in requirements.txt requirements-dev.txt plugins/cd4ml/tests/requirements-dev.txt; do
-            [ -f "$f" ] && pip install -r "$f"
-          done
-      - run: |
-          which pytest || echo "Pytest not gefunden!"
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          if [ -f plugins/cd4ml/tests/requirements-dev.txt ]; then pip install -r plugins/cd4ml/tests/requirements-dev.txt; fi
+      - name: Check Pytest installation
+        run: |
+          which pytest || echo "Pytest not found!"
           pytest --version
-      - run: |
+      - name: Run pytest in repository (ignoring test_predict_service.py)
+        run: |
           pytest . --maxfail=1 --disable-warnings -q \
             --ignore=tests/test_predict_service.py \
             --ignore=plugins/cd4ml/tests/test_predict_service.py
@@ -116,6 +137,7 @@ jobs:
           - name: tests
             dockerfile: dockerfiles/tests/Dockerfile
             tag: tests
+          # neu hinzugefügt
           - name: airflow-webserver
             dockerfile: dockerfiles/airflow/Dockerfile
             tag: airflow-webserver
@@ -134,7 +156,8 @@ jobs:
         with:
           path: /home/runner/.docker/registry-v2
           key: ${{ runner.os }}-docker-${{ github.sha }}
-          restore-keys: ${{ runner.os }}-docker-
+          restore-keys: |
+            ${{ runner.os }}-docker-
 
       - uses: docker/setup-buildx-action@v3
 
