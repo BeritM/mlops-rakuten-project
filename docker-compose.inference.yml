@@ -2,7 +2,7 @@ services:
   dvc-sync:
     build:
       #context: "./dockerfiles/dvc"
-      context: . ############################### Changed Pathing
+      context: "." ############################### Changed Pathing
       #dockerfile: "Dockerfile"
       dockerfile: dockerfiles/dvc/Dockerfile ####################### changed Pathing
     volumes:
