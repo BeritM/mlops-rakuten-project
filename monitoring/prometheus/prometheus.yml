@@ -32,11 +32,14 @@ scrape_configs:
 #      - targets:
 #          - 'localhost:9090'
 
-#alerting:
-#  alertmanagers:
-#    - static_configs:
-#        - targets:
-#            - 'alertmanager:9093'
+alerting:
+ alertmanagers:
+   - static_configs:
+       - targets:
+           - 'alertmanager:9093'
 
-#rule_files:
-#  - '/etc/prometheus/alert_rules.yml'
+rule_files:
+  # Precomputed recording rules for frequent metrics
+  - '/etc/prometheus/recording_rules.yml'
+  # Alert definitions
+  - '/etc/prometheus/alert_rules.yml'

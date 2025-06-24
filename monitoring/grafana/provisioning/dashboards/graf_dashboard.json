@@ -1,0 +1,36 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "dynamic_mlops",
+    "title": "Dynamic MLOPS Dashboard",
+    "timezone": "browser",
+    "schemaVersion": 37,
+    "version": 1,
+    "templating": {
+      "list": [
+        {
+          "name": "job",
+          "type": "query",
+          "query": "label_values(job)",
+          "multi": true,
+          "includeAll": true
+        }
+      ]
+    },
+    "panels": [
+      {
+        "type": "timeseries",
+        "title": "CPU Rate per Service",
+        "gridPos": { "x": 0, "y": 0, "w": 24, "h": 6 },
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{job=\"$job\"}[5m])",
+            "refId": "A"
+          }
+        ],
+        "repeat": { "variable": "job" }
+      }
+    ]
+  },
+  "overwrite": true
+}

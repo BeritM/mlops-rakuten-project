@@ -1,0 +1,81 @@
+# monitoring/prometheus/alert_rules.yml
+# -------------------------------------
+# Alert Rules (Best Practices)
+# - Klare Gruppennamen
+# - Alerts mit Severity-Labels
+# - Annotations für Kontext & Links
+
+groups:
+
+  # 1. Service-Health Alerts
+  - name: service_health
+    rules:
+      # Auth-Service unreachable
+    - alert: AuthServiceDown
+      expr: up{job="auth_service"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Auth-Service ist nicht erreichbar"
+        description: "Prometheus kann den Auth-Service seit mehr als 1 Minute nicht erreichen."
+
+      # Predict-Service unreachable
+    - alert: PredictServiceDown
+      expr: up{job="predict_service"} == 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Predict-Service ist nicht erreichbar"
+        description: "Prometheus kann den Predict-Service seit mehr als 1 Minute nicht erreichen."
+
+
+  # 2. Performance Alerts
+  - name: performance_alerts
+    rules:
+      # Hohe Latenz im Auth-Service (>100 ms für 95. Perzentil)
+    - alert: AuthServiceHighLatency
+      expr: |
+        histogram_quantile(
+          0.95,
+          sum by(job, le) (
+            rate(auth_service_request_latency_seconds_bucket[5m])
+          )
+        ) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Hohe Latenz im Auth-Service"
+        description: "95%-Quantil der /health Latenz liegt über 100 ms."
+
+      # Hohe Latenz im Predict-Service (>200 ms für 95. Perzentil)
+    - alert: PredictServiceHighLatency
+      expr: |
+        histogram_quantile(
+          0.95,
+          sum by(job, le) (
+            rate(prediction_latency_seconds_bucket[5m])
+          )
+        ) > 0.2
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Hohe Latenz im Predict-Service"
+        description: "95%-Quantil der /predict Latenz liegt über 200 ms."
+
+
+  # 3. Business/Drift Alerts
+  - name: drift_alerts
+    rules:
+      # F1-Score unter kritischem Schwellwert
+    - alert: F1ScoreTooLow
+      expr: prediction_f1_score < 0.6
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Weighted F1 Score < 60 %"
+        description: "Der Weighted F1 Score der Prediction-API ist seit über 5 Minuten unter 60 % (aktuell {{ $value }} )."
