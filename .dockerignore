@@ -60,10 +60,4 @@ main.py
 READ_ME_FOR AIRFLOW.md
 READ_ME_drift.md
 
-# Personal
-run_pipeline.sh
-run_tasks_instead_of_make.py
-.dockerignore.personal
-.dvcignore.personal
-00.to_do.txt
 

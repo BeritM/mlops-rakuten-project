@@ -49,5 +49,5 @@ RUN pip install --no-cache-dir \
 # ─── Set PYTHONPATH ─────────────────────────────────────────────────────────────
 ENV PYTHONPATH=/opt/airflow/project:$PYTHONPATH
 
-# ─── DVC-Cache als Docker-Volume ──────────────────────────────────────────────
+# ─── DVC-Cache as Docker-Volume ──────────────────────────────────────────────
 VOLUME ["/opt/airflow/project/.dvc/cache"]
