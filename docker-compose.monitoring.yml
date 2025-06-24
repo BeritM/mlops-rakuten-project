@@ -135,7 +135,7 @@ services:
       - '3000:3000'
     volumes:
       - grafana_data:/var/lib/grafana
-    #  - ./monitoring/grafana/provisioning/:/etc/grafana/provisioning/ # --> für späteres provisioning
+      - ./monitoring/grafana/provisioning/:/etc/grafana/provisioning/ 
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin123
