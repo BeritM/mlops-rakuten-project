@@ -5,7 +5,7 @@ WORKDIR /workspace
 # install git and curl
 RUN apt-get update && apt-get install -y git curl gosu && rm -rf /var/lib/apt/lists/*
 
-# Git safe directory configuration - WICHTIG!
+# Git safe directory configuration 
 RUN git config --global --add safe.directory /app
 RUN git config --global --add safe.directory '*'
 
