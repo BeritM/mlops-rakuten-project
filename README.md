@@ -104,6 +104,7 @@ mlops-rakuten-project/
 ├── docker-compose.yml              # Multi service training Pipeline
 ├── dockerfiles/                    # One Dockerfile per micro‑service
 ├── dags/                           # Airflow DAGs
+├── monitoring/                     # Monitoring Metafiles
 ├── plugins/                        # Domain logic
 │   └── cd4ml/                      #  ├─ data_processing/
 │                                   #  ├─ model_training/
@@ -202,14 +203,21 @@ The helper script `dvc_push_manager.py` automates *DVC ➜ Git* synchronisatio
 
 ---
 
-## Monitoring & Observability - To Be Adjusted!
+## Monitoring & Observability
 
-| Aspect                 | Current State                                 |
-| ---------------------- | --------------------------------------------- |
-| **Service health**     | FastAPI `/health` endpoints + Docker HC       |
-| **Metrics**            | Prometheus exporter (baseline)                |
-| **Dashboards**         | Grafana (pre‑configured)                      |
-| **Data / Model Drift** | *Evidently* integration placeholder (Phase 4) |
+Spin up the full observability stack:
+
+```bash
+docker compose -f docker-compose.monitoring.yml up -d
+```
+
+| Aspect                 | Implementation                                                                                                                                                                                                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Service health**     | FastAPI `/health` endpoints for **auth\_service** & **predict\_service** + Docker health‑checks.                                                                                                                                                                                  |
+| **Metrics**            | **Prometheus** scrapes container metrics *and* ingests batch KPIs (e.g. weighted F1) via **Pushgateway** – populated by `monitor/monitor.py`.                                                                                                                                     |
+| **Dashboards**         | **Grafana** (port 3000) with pre‑wired Prometheus data‑source; import or build panels on the fly.                                                                                                                                                                                 |
+| **Alerting**           | **Alertmanager** (port 9093) already referenced in `prometheus.yml`; add rules in `monitoring/prometheus/alert_rules.yml`.                                                                                                                                                        |
+| **Data / Model Drift** | Dedicated **drift monitor** (<code>drift\_monitor\_service:8003</code>) uses Evidently to compute drift metrics, pushes them to Pushgateway and stores HTML/JSON reports in <code>logs/</code>. See [`README-drift.md`](README-drift.md) for details & manual execution commands. |                                         |
 
 ---
 
@@ -224,7 +232,7 @@ The helper script `dvc_push_manager.py` automates *DVC ➜ Git* synchronisatio
 
 ## CI/CD & Testing
 
-A **single GitHub Actions workflow** (`.github/workflows/docker-publish.yml`) runs on each push / PR to **`main`**, **`develop`** or the dedicated feature branch.
+A **single GitHub Actions workflow** (`.github/workflows/docker-publish.yml`) runs on each push to and pull from **`main`** or **`develop`**.
 
 | Stage                   | What happens?                                                                                                          |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -246,15 +254,16 @@ A green check‑mark in GitHub shows the pipeline passed.
 
 ### Local Endpoints
 
-| Service        | URL                     | Notes                                             |
-| -------------- | ----------------------- | ------------------------------------------------- |
-| Airflow Web UI | `http://localhost:8080` | DAG management                                    |
-| Auth API       | `http://localhost:8001` | `/login`, `/users`, `/health`                     |
-| Predict API    | `http://localhost:8002` | `/predict`, `/model-info`, `/feedback`, `/health` |
-| Grafana\*      | `http://localhost:3000` | Dashboards                                        |
-| Prometheus\*   | `http://localhost:9090` | Metrics explorer                                  |
+| Service        | URL                     | Notes                                                 |                                                                                                    |
+| -------------- | ----------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Airflow Web UI | `http://localhost:8080` | DAG management                                        |                                                                                                    |
+| Auth API       | `http://localhost:8001` | `/login`, `/users`, `/health`                         |                                                                                                    |
+| Predict API    | `http://localhost:8002` | `/predict`, `/model-info`, `/feedback`, `/health`     |                                                                                                    |
+| Grafana\*      | `http://localhost:3000` | Dashboards                                            |                                                                                                    |
+| Prometheus\*   | `http://localhost:9090` | Metrics explorer                                      |                                                                                                    |
+| Pushgateway\*  | `http://localhost:9091` | Receives batch metrics (e.g. F1) from monitoring jobs |                                                                                                    |
+| Alertmanager\* | `http://localhost:9093` | Sends notifications based on Prometheus alert rules   
 
-*Grafana & Prometheus are optional, enabled only when the monitoring stack is started via Docker Compose.*
 
 **Streamlit UI** (launch locally):
 
@@ -289,5 +298,9 @@ Licensed by the Rakuten Institute of Technology.
 * Anomalisaa
 * SebastianPoppitz
 * Tubetraveller
+
+
+
+
 
 
