@@ -4,29 +4,41 @@
   "timezone": "browser",
   "panels": [
     {
-      "title": "Total Requests",
+      "title": "Requests per Second (Auth Service)",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "sum(auth_service_requests_total) by (method, endpoint, status_code)",
-          "legendFormat": "{{method}} {{endpoint}} {{status_code}}"
+          "expr": "sum by (method, endpoint, status_code) (rate(auth_service_requests_total[$__rate_interval]))",
+          "legendFormat": "{{endpoint}} {{status_code}} {{method}}"
         }
       ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "reqps"
         }
       }
     },
     {
-      "title": "Request Latency",
-      "type": "histogram",
+      "title": "Request Latency (Auth Service)",
+      "type": "timeseries",
       "targets": [
         {
-          "expr": "auth_service_request_latency_seconds_bucket",
-          "legendFormat": "{{method}} {{endpoint}} le={{le}}"
+          "expr": "histogram_quantile(0.99, sum(rate(auth_service_request_latency_seconds_bucket[5m])) by (le, method, endpoint))",
+          "legendFormat": "{{endpoint}} {{method}} "
         }
       ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "seconds"
