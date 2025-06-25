@@ -130,7 +130,8 @@ Grafana UI: http://localhost:3000 -> (admin/admin123) -> go to Dashboards
 - From the dropdown, select prediction_f1_score. That will autocomplete the metric name into the input.
 
 # Trigger Alertmanager
+
 ...
 
 
-Watch Dag Trigger: Airflow: http://localhost:8080
+-> Watch Alert triggering Dag Airflow: http://localhost:8080 (airflow/airflow)
