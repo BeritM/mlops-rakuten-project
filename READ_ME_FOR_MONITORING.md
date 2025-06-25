@@ -75,7 +75,7 @@ This POST automatically kicks off the retraining pipeline in Airflow.
 
 ## monitoring/prometheus/alert_rules.yml
 
-- Define the ModelF1Drop alert rule (10% drop, 5m for).
+- Define the ModelF1Drop alert rule (10% drop, 5m).
 
 ## monitoring/prometheus/alertmanager.yml
 
@@ -92,7 +92,6 @@ This POST automatically kicks off the retraining pipeline in Airflow.
 - JSON dashboard files authentication, drift & F1, prediction performance are visible in Grafana as Dashboard panels.
 
 
-
 # Running the Stack
 
 - Run the docker-compose files 
@@ -102,8 +101,8 @@ Attention: They need to be started simultanously to create a common network.
 docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build -d
 ``` 
 
-*First compose starts Airflow, Auth, Predict, DVC ...
-*Second compose starts Prometheus, Alertmanager, Grafana, Blackbox
+- First compose starts Airflow, Auth, Predict, DVC ...
+- Second compose starts Prometheus, Alertmanager, Grafana, Blackbox
 
 - Check Status
 ```bash
@@ -132,3 +131,6 @@ Grafana UI: http://localhost:3000 -> (admin/admin123) -> go to Dashboards
 
 # Trigger Alertmanager
 ...
+
+
+Watch Dag Trigger: Airflow: http://localhost:8080
