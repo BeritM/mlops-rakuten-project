@@ -47,11 +47,11 @@ The exporter in plugins/cd4ml/inference/predict_service.py uses the Prometheus P
 
 In monitoring/prometheus/prometheus.yml, the scrape_configs section defines pull jobs that Prometheus runs every 15 seconds. In our setup, Prometheus scrapes the Evidently‐derived metrics directly from both the Auth and Predict services, and it also uses the Blackbox Exporter to probe the Predict service’s health-check endpoint.
 
-The monitoring/grafana/provisioning/dashboards/dashboards.yml file tells Grafana (running on port 3000) where to find your JSON dashboard definitions. Grafana then automatically imports each .json file under that directory as a separate dashboard, and every panel within them is defined by a PromQL query against your Prometheus data source.
+The monitoring/grafana/provisioning/dashboards/dashboards.yml file tells Grafana (running on port 3000) where to find the JSON dashboard definitions. Grafana then automatically imports each .json file under that directory as a separate dashboard, and every panel within them is defined by a PromQL query against the Prometheus data source.
 
 The monitoring/prometheus/alert_rules.yml file defines Prometheus alerting rules—most importantly, it fires a ModelF1Drop alert whenever the prediction_f1_score metric falls by more than 10 % compared to one hour ago.
 
-In monitoring/prometheus/alertmanager.yml, a webhook receiver is configured so that any alert fired by Prometheus triggers an HTTP POST to the Airflow REST API endpoint for your ml_pipeline_mixed_experiment_dvc DAG:
+In monitoring/prometheus/alertmanager.yml, a webhook receiver is configured so that any alert fired by Prometheus triggers an HTTP POST to the Airflow REST API endpoint for the ml_pipeline_mixed_experiment_dvc DAG:
 
 ```bash
 POST http://airflow-webserver:8080/api/v1/dags/ml_pipeline_mixed_experiment_dvc/dagRuns
@@ -123,7 +123,7 @@ Alertmanager: http://localhost:9093
 
 Grafana UI: http://localhost:3000 -> (admin/admin123) -> go to Dashboards
 
-# Trigger Test
+# Trigger Test step-by-step
 
 - Click “Query” in the top nav to open the expression editor.
 - Make sure you’re on the “Graph” view (not “Table”).
