@@ -86,6 +86,11 @@ MODEL_PERFORMANCE_F1_SCORE_CURRENT = Gauge(
     'F1 score of the current model on recent feedback data with ground truth'
 )
 
+MODEL_PERFORMANCE_PRECISION_CURRENT = Gauge(
+    'model_performance_precision_current',
+    'Precision of the current model on recent feedback data with ground truth'
+)
+
 
 def calculate_and_expose_f1():
     while True:
@@ -159,6 +164,7 @@ def calculate_and_expose_drift():
                 PREDICTION_DRIFT_DETECTED.set(0)
                 PREDICTION_DRIFT_SCORE.set(0)
                 MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+                MODEL_PERFORMANCE_PRECISION_CURRENT.set(0)
                 time.sleep(300)
                 continue
 
@@ -169,6 +175,7 @@ def calculate_and_expose_drift():
                 PREDICTION_DRIFT_DETECTED.set(0)
                 PREDICTION_DRIFT_SCORE.set(0)
                 MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+                MODEL_PERFORMANCE_PRECISION_CURRENT.set(0)
                 time.sleep(300)
                 continue
 
@@ -253,6 +260,7 @@ def calculate_and_expose_drift():
             print(f"F1: {f1:.3f}, Precision: {precision:.3f}")
 
             MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(f1)
+            MODEL_PERFORMANCE_PRECISION_CURRENT.set(precision)
 
 
         except Exception as e:

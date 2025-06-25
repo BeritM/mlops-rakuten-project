@@ -1,0 +1,32 @@
+{
+  "title": "Prediction Performance Monitoring",
+  "panels": [
+    {
+      "title": "Prediction F1 Score",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "prediction_f1_score" }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 }
+    },
+    {
+      "title": "Prediction Requests Total",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "sum(increase(prediction_requests_total[5m]))" }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 }
+    },
+    {
+      "title": "Prediction Latency (s)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(prediction_latency_seconds_bucket[5m])) by (le))" }
+      ],
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 }
+    }
+  ],
+  "schemaVersion": 37,
+  "version": 1,
+  "editable": true
+}

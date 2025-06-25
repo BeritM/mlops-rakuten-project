@@ -1,0 +1,37 @@
+{
+  "title": "Auth Service Metrics Dashboard",
+  "uid": "auth_service_dashboard",
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "Total Requests",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "sum(auth_service_requests_total) by (method, endpoint, status_code)",
+          "legendFormat": "{{method}} {{endpoint}} {{status_code}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "title": "Request Latency",
+      "type": "histogram",
+      "targets": [
+        {
+          "expr": "auth_service_request_latency_seconds_bucket",
+          "legendFormat": "{{method}} {{endpoint}} le={{le}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "seconds"
+        }
+      }
+    }
+  ]
+}

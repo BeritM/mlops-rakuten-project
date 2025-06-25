@@ -1,10 +1,9 @@
-version: '3.8'
-
 volumes:
   shared-volume: {}
   dvc-cache-volume: {}
   #postgres-db-volume: {}
   grafana_data: {}
+  prometheus_data: {}
 
 services:
   dvc-sync:
@@ -101,6 +100,7 @@ services:
     container_name: prometheus_service
     volumes:
       - ./monitoring/prometheus/:/etc/prometheus/:ro
+      - prometheus_data:/prometheus
     ports:
       - '9090:9090'
     command:
@@ -108,20 +108,18 @@ services:
     depends_on:
       - auth_service
       - predict_service
-    #networks:
-    #  - drift-net
 
-  alertmanager:
-    image: prom/alertmanager:v0.24.0
-    container_name: alertmanager_service
-    volumes:
-      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-    ports:
-      - '9093:9093'
-    depends_on:
-      - prometheus
+  #alertmanager:
+  #  image: prom/alertmanager:v0.24.0
+  #  container_name: alertmanager_service
+  #  volumes:
+  #    - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+  #  command:
+  #    - '--config.file=/etc/alertmanager/alertmanager.yml'
+  #  ports:
+  #    - '9093:9093'
+  #  depends_on:
+  #    - prometheus
     #networks:
     #  - drift-net
 
@@ -132,14 +130,15 @@ services:
       - '3000:3000'
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning/:/etc/grafana/provisioning/:ro
+      - ./monitoring/grafana/provisioning/:/etc/grafana/provisioning/
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin123
       GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_LOG_LEVEL: debug
     depends_on:
       - prometheus
-      - alertmanager
+    #  - alertmanager
     #networks:
     #  - drift-net
 

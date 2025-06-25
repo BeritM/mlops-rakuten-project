@@ -11,9 +11,9 @@ scrape_configs:
     static_configs:
       - targets: ['predict_service:8002']
 
-  - job_name: 'evidently'
-    static_configs:
-      - targets: ['host.docker.internal:8000']
+  #- job_name: 'evidently'
+  #  static_configs:
+  #    - targets: ['host.docker.internal:8000']
 
 ## ISABELL ##
 #  - job_name: 'pushgateway'
@@ -36,14 +36,14 @@ scrape_configs:
 #      - targets:
 #          - 'localhost:9090'
 
-alerting:
- alertmanagers:
-   - static_configs:
-       - targets:
-           - 'alertmanager:9093'
+#alerting:
+# alertmanagers:
+#   - static_configs:
+#       - targets:
+#           - 'alertmanager:9093'
 
-rule_files:
+#rule_files:
   # Precomputed recording rules for frequent metrics
-  - '/etc/prometheus/recording_rules.yml'
+#  - '/etc/prometheus/recording_rules.yml'
   # Alert definitions
-  - '/etc/prometheus/alert_rules.yml'
+#  - '/etc/prometheus/alert_rules.yml'
