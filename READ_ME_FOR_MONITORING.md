@@ -14,11 +14,12 @@ to alerting and dashboard provisioning.
   2.3 alertmanager.yml  
 
 3. Grafana Setup
+
     3.1 dashboards.yml
     3.2 Dashboard JSON Files
 
 # Project Structure
-
+```text
 monitoring/
 ├── grafana/
 │   └── provisioning/
@@ -35,6 +36,7 @@ plugins/
 └── cd4ml/
     └── inference/
         └── predict_service.py  # FastAPI exporter
+```
 
 # Step-by-Step File Contents
 
