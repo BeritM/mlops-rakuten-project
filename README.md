@@ -1,7 +1,8 @@
 # Rakuten Product Category Classification – MLOps Reference Implementation
 
 A production‑grade, **end‑to‑end MLOps pipeline** for automatic product‑type classification on the Rakuten retail dataset.
-While the underlying model currently relies on text features (SGD + TF‑IDF), the focus of this repository is the surrounding **operational ecosystem**: repeatable data pipelines, experiment tracking, automated testing/deployment, secure inference services and production monitoring.
+
+> **Project Scope (2025):** This fork focuses *exclusively* on **text‑based classification**. Unlike the original data‑science prototype that blended CNN image features with TF‑IDF, we rely solely on an SGD + TF‑IDF model (\~82 % weighted F1 across 27 classes). All accompanying MLOps infrastructure—data versioning, CI/CD, secure inference, monitoring—targets this single‑modal pipeline.
 
 ---
 
@@ -19,6 +20,8 @@ While the underlying model currently relies on text features (SGD + TF‑IDF),
 10. [Project Roadmap](#project-roadmap)
 11. [Contributing](#contributing)
 12. [License](#license)
+
+*For detailed instructions on the monitoring and drift‑detection components, see* [READ\_ME\_FOR\_MONITORING.md](READ_ME_FOR_MONITORING.md) *and* [README\_drift.md](README_drift.md).
 
 ---
 
@@ -101,18 +104,22 @@ flowchart LR
 
 ```text
 mlops-rakuten-project/
-├── docker-compose.yml              # Multi service training Pipeline
+├── docker-compose.yml              # Core micro‑services
+├── docker-compose.monitoring.yml   # Monitoring stack (Prometheus, Grafana …)
 ├── dockerfiles/                    # One Dockerfile per micro‑service
 ├── dags/                           # Airflow DAGs
-├── monitoring/                     # Monitoring Metafiles
 ├── plugins/                        # Domain logic
 │   └── cd4ml/                      #  ├─ data_processing/
 │                                   #  ├─ model_training/
 │                                   #  ├─ model_validation/
-|                                   #  ├─ tests/
-│                                   #  └─ inference/
+|                                   #  ├─ inference/
+│                                   #  └─ tests/
+├── monitoring/                     # Prometheus / Grafana configs
+├── drift_monitor/                  # Scheduled drift detection
 ├── shared_volume/                  # **DVC‑tracked** data & models
 ├── ui_app.py                       # Streamlit front‑end
+├── READ_ME_FOR_MONITORING.md       # Full monitoring guide
+├── README_drift.md                 # Drift module guide
 └── README.md                       # (this file)
 ```
 
@@ -125,7 +132,7 @@ mlops-rakuten-project/
 ### 1 – Prerequisites
 
 * **Docker ≥ 23** – Runtime engine for all containerised services.
-* **`docker compose` CLI** – Starts the entire stack in one shot.
+* \`\`\*\* CLI\*\* – Starts the entire stack in one shot.
 * **Git** – Required to clone / fork *this* repository; present inside the containers for internal commits.
 * **DVC** – Already included into the Docker images for pipeline steps. Install *locally* only if you need to run `dvc pull/push` outside the containers (see [`READ_ME_FOR_DVC.md`](READ_ME_FOR_DVC.md)).
 
@@ -137,33 +144,40 @@ cd mlops-rakuten-project
 cp .env.example .env        # fill in GitHub & Dagshub creds
 ```
 
-### 3 – Run the full stack locally
+### 3 – Run the core stack locally
 
 ```bash
 # Pull raw data / models from Dagshub & execute the pipeline
 docker compose up --build
 # ⇒  http://localhost:8001  Auth Service
 # ⇒  http://localhost:8002  Prediction API
-# ⇒  http://localhost:3000  Grafana
-# ⇒  http://localhost:9090  Prometheus
 # ⇒  http://localhost:8080  Airflow
 ```
 
-*Artifacts and metrics will be pushed automatically to GitHub/Dagshub.*
+### 4 – (Optionally) start the monitoring stack
 
-### 4 – Launch the Streamlit demo
+```bash
+docker compose -f docker-compose.monitoring.yml up --build -d
+# ⇒  http://localhost:9090  Prometheus
+# ⇒  http://localhost:9093  Alertmanager
+# ⇒  http://localhost:3000  Grafana
+```
+
+Artifacts and metrics will be pushed automatically to GitHub / Dagshub.
+
+### 5 – Launch the Streamlit demo
 
 ```bash
 streamlit run ui_app.py
 ```
+
 ---
 
 ## Pipeline Walk‑Through
 
 ### Data Management
 
-* **Ingestion & Pre‑processing** `plugins/cd4ml/data_processing/run_preprocessing.py`
-  Cleans multilingual text, splits sets, computes TF‑IDF, stores artefacts to DVC.
+* **Ingestion & Pre‑processing** `plugins/cd4ml/data_processing/run_preprocessing.py` Cleans multilingual text, splits sets, computes TF‑IDF, stores artefacts to DVC.
 * **Versioning** Full lineage of raw/processed data, models and feedback stored on a Dagshub‑backed **S3 bucket**.
 
 ### Model Training
@@ -185,11 +199,11 @@ streamlit run ui_app.py
 
 ## Versioning & Experiment Tracking
 
-| Layer             | Tooling      | Remote                                     |
-| ----------------- | ------------ | ------------------------------------------ |
-| **Code**          | Git + GitHub | `main` ➜ protected                        |
-| **Data / Models** | DVC          | S3 bucket (Dagshub)                        |
-| **Experiments**   | MLflow       | Dagshub‑hosted MLflow server               |
+| Layer             | Tooling      | Remote                       |
+| ----------------- | ------------ | ---------------------------- |
+| **Code**          | Git + GitHub | `main` ➜ protected           |
+| **Data / Models** | DVC          | S3 bucket (Dagshub)          |
+| **Experiments**   | MLflow       | Dagshub‑hosted MLflow server |
 
 The helper script `dvc_push_manager.py` automates *DVC ➜ Git* synchronisation.
 
@@ -197,7 +211,7 @@ The helper script `dvc_push_manager.py` automates *DVC ➜ Git* synchronisatio
 
 ## Orchestration & Automation
 
-* **Local** – `docker‑compose.yaml` wires the individual services and shared volumes.
+* **Local** – `docker‑compose.yml` wires the individual services and shared volumes.
 * **Batch** – `ml_pipeline_mixed_experiment_dvc.py` Airflow DAG runs every 10 min and orchestrates the four Docker containers with `DockerOperator`.
 * **CI / Tests** – GitHub Actions build images, execute linters + the PyTest suite located in `plugins/cd4ml/tests`.
 
@@ -205,19 +219,15 @@ The helper script `dvc_push_manager.py` automates *DVC ➜ Git* synchronisatio
 
 ## Monitoring & Observability
 
-Spin up the full observability stack:
+*For an in‑depth walkthrough, refer to* [READ\_ME\_FOR\_MONITORING.md](READ_ME_FOR_MONITORING.md).
 
-```bash
-docker compose -f docker-compose.monitoring.yml up -d
-```
-
-| Aspect                 | Implementation                                                                                                                                                                                                                                                                    |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Service health**     | FastAPI `/health` endpoints for **auth\_service** & **predict\_service** + Docker health‑checks.                                                                                                                                                                                  |
-| **Metrics**            | **Prometheus** scrapes container metrics *and* ingests batch KPIs (e.g. weighted F1) via **Pushgateway** – populated by `monitor/monitor.py`.                                                                                                                                     |
-| **Dashboards**         | **Grafana** (port 3000) with pre‑wired Prometheus data‑source; import or build panels on the fly.                                                                                                                                                                                 |
-| **Alerting**           | **Alertmanager** (port 9093) already referenced in `prometheus.yml`; add rules in `monitoring/prometheus/alert_rules.yml`.                                                                                                                                                        |
-| **Data / Model Drift** | Dedicated **drift monitor** (<code>drift\_monitor\_service:8003</code>) uses Evidently to compute drift metrics, pushes them to Pushgateway and stores HTML/JSON reports in <code>logs/</code>. See [`README-drift.md`](README-drift.md) for details & manual execution commands. |                                         |
+| Aspect                 | Current State                                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- |
+| **Service health**     | FastAPI `/health` endpoints + Docker health‑checks; probed by Prometheus Blackbox Exporter            |
+| **Metrics**            | Evidently‑derived and service‑level metrics exported via Prometheus Python client (`/metrics`)        |
+| **Dashboards**         | Pre‑provisioned Grafana dashboards (auth, drift/F1, performance) under `monitoring/grafana/…`         |
+| **Data / Model Drift** | Daily drift job (see `drift_monitor/`) pushes Evidently scores to Prometheus; alerts trigger Airflow  |
+| **Alerting**           | Prometheus rules (e.g. *ModelF1Drop* > 10 %) routed to Alertmanager ➜ Airflow retraining webhook      |
 
 ---
 
@@ -232,7 +242,7 @@ docker compose -f docker-compose.monitoring.yml up -d
 
 ## CI/CD & Testing
 
-A **single GitHub Actions workflow** (`.github/workflows/docker-publish.yml`) runs on each push to and pull from **`main`** or **`develop`**.
+A **single GitHub Actions workflow** (`.github/workflows/docker-publish.yml`) runs on each push to or pull from **`main`** or **`develop`**.
 
 | Stage                   | What happens?                                                                                                          |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -254,16 +264,16 @@ A green check‑mark in GitHub shows the pipeline passed.
 
 ### Local Endpoints
 
-| Service        | URL                     | Notes                                                 |                                                                                                    |
-| -------------- | ----------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Airflow Web UI | `http://localhost:8080` | DAG management                                        |                                                                                                    |
-| Auth API       | `http://localhost:8001` | `/login`, `/users`, `/health`                         |                                                                                                    |
-| Predict API    | `http://localhost:8002` | `/predict`, `/model-info`, `/feedback`, `/health`     |                                                                                                    |
-| Grafana\*      | `http://localhost:3000` | Dashboards                                            |                                                                                                    |
-| Prometheus\*   | `http://localhost:9090` | Metrics explorer                                      |                                                                                                    |
-| Pushgateway\*  | `http://localhost:9091` | Receives batch metrics (e.g. F1) from monitoring jobs |                                                                                                    |
-| Alertmanager\* | `http://localhost:9093` | Sends notifications based on Prometheus alert rules   
+| Service        | URL                     | Notes                                                         |
+| -------------- | ----------------------- | ------------------------------------------------------------- |
+| Airflow Web UI | `http://localhost:8080` | DAG management                                                |
+| Auth API       | `http://localhost:8001` | `/login`, `/users`, `/health`, `/metrics`                     |
+| Predict API    | `http://localhost:8002` | `/predict`, `/model-info`, `/feedback`, `/health`, `/metrics` |
+| Prometheus\*   | `http://localhost:9090` | Metrics explorer                                              |
+| Alertmanager\* | `http://localhost:9093` | Alert routing                                                 |
+| Grafana\*      | `http://localhost:3000` | Dashboards (admin/admin123)                                   |
 
+*Endpoints marked with an asterisk are available only when the monitoring stack is running (**`docker-compose.monitoring.yml`**).*
 
 **Streamlit UI** (launch locally):
 
@@ -272,7 +282,6 @@ streamlit run ui_app.py --server.port 8501
 ```
 
 → [http://localhost:8501](http://localhost:8501)
-
 
 ---
 
@@ -298,9 +307,3 @@ Licensed by the Rakuten Institute of Technology.
 * Anomalisaa
 * SebastianPoppitz
 * Tubetraveller
-
-
-
-
-
-
