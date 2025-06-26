@@ -90,7 +90,7 @@ graph LR;
   VAL --> ML
 
   REG --> MODEL_ART --> API
-  AUTH --- API
+  AUTH --> API
 
   API --> FB
   API --> EV --> PR 
