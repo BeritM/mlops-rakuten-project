@@ -93,9 +93,10 @@ graph LR;
   AUTH --- API
 
   API --> FB
-  API --> EV --> PR --> GF & ALERT
-  API --> PR --> GF & ALERT
-  AUTH --> PR --> GF & ALERT
+  API --> EV --> PR 
+  API --> PR 
+  AUTH --> PR 
+  PR --> GF & ALERT
 ```
 
 *The diagram shows the complete lifecycle from raw data ingestion through to monitored deployment in production.*
