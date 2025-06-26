@@ -64,7 +64,7 @@ graph LR;
     direction LR
     ML[Model Tracking<br>MLflow]
     REG[Model Registry<br>MLflow]
-    MODEL_ART[/Model Artifacts/<br>MLflow]
+    MODEL_ART[Model Artifacts<br>MLflow]
   end
 
   %% Deployment & Security
