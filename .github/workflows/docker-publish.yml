@@ -198,4 +198,4 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - run: docker compose build
-      - run: docker compose -f docker-compose.inference.yml build
+      # - run: docker compose -f docker-compose.inference.yml build <- obsolete

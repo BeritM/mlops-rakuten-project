@@ -2,7 +2,7 @@ groups:
   - name: model_performance
     rules:
       - alert: ModelF1Drop
-        expr: prediction_f1_score < 0.5 * prediction_f1_score offset 1h
+        expr: prediction_f1_score < 0.9 * prediction_f1_score offset 1h #0.9 instad of 0.5 which means 90% of the last time measured
         for: 5m
         labels:
           severity: critical
