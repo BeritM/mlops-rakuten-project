@@ -177,7 +177,7 @@ streamlit run ui_app.py
 
 ### Data Management
 
-* **Ingestion & Pre‑processing** `plugins/cd4ml/data_processing/run_preprocessing.py` Cleans multilingual text, splits sets, computes TF‑IDF, stores artefacts to DVC.
+* **Ingestion & Pre‑processing** `plugins/cd4ml/data_processing/run_preprocessing.py` Ingests original training data set and human feedback provided through the prediction service, cleans multilingual text, splits sets, computes TF‑IDF, stores artefacts to DVC.
 * **Versioning** Full lineage of raw/processed data, models and feedback stored on a Dagshub‑backed **S3 bucket**.
 
 ### Model Training
@@ -191,8 +191,8 @@ streamlit run ui_app.py
 
 ### Deployment
 
-* **Auth Service** – FastAPI, JWT (HS256), role‑based CRUD over `/users`.
-* **Predict Service** – FastAPI, loads vectoriser + model from MLflow; requires `token` header issued by Auth service.
+* **Auth Service** – FastAPI app that implements OAuth2 login against an in-memory user store, issues and verifies HS256 JWTs (with a 30 min expiry), enforces role-based (admin) CRUD on `/users`, and exposes `/health` plus a Prometheus-compatible `/metrics` endpoint 
+* **Predict Service** – FastAPI app that verifies HS256 JWTs, loads the TF-IDF vectorizer and SGD model from MLflow on startup, exposes `/predict` (logging each request’s output to a CSV with file-locking and asynchronous DVC/Git pushes), `/feedback` (updating that CSV and triggering pushes), `/model-info`, `/health`, and Prometheus-compatible `/metrics` endpoints, and continuously computes an F1-score gauge plus request-count and latency metrics via background threads and middleware.
 * **UI** – Streamlit dashboard for manual predictions & feedback collection.
 
 ---
