@@ -2,6 +2,9 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+rule_files:
+  - "alert_rules.yml"
+
 scrape_configs:
   - job_name: 'auth_service'
     static_configs:
@@ -10,6 +13,23 @@ scrape_configs:
   - job_name: 'predict_service'
     static_configs:
       - targets: ['predict_service:8002']
+
+  - job_name: 'api_probe'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - 'http://predict_service:8002/health'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: 'blackbox-exporter:9115'
+        
+  #- job_name: 'evidently'
+  #  static_configs:
+  #    - targets: ['host.docker.internal:8000']
 
 ## ISABELL ##
 #  - job_name: 'pushgateway'
@@ -33,10 +53,13 @@ scrape_configs:
 #          - 'localhost:9090'
 
 #alerting:
-#  alertmanagers:
-#    - static_configs:
-#        - targets:
-#            - 'alertmanager:9093'
+# alertmanagers:
+#   - static_configs:
+#       - targets:
+#           - 'alertmanager:9093'
 
 #rule_files:
+  # Precomputed recording rules for frequent metrics
+#  - '/etc/prometheus/recording_rules.yml'
+  # Alert definitions
 #  - '/etc/prometheus/alert_rules.yml'

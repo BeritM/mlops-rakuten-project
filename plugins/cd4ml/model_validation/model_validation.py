@@ -19,7 +19,7 @@ def prediction_and_metrics(X_validate_tfidf: pd.DataFrame, y_validate: pd.DataFr
     val_f1 = f1_score(y_validate, y_pred_validate, average='weighted')
     class_report = classification_report(y_validate, y_pred_validate)
 
-    return val_accuracy, val_f1, class_report
+    return val_accuracy, val_f1, class_report, y_pred_validate
 
 def save_txt_file(output_dir: str, file_name: str, content: str):
     report_path = f"{output_dir}/{file_name}.txt"

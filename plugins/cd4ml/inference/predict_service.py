@@ -9,9 +9,17 @@ from typing import Optional
 from dvc_push_manager import track_and_push_with_retry
 import threading
 from prometheus_client import generate_latest, Gauge, Counter, Histogram
+from evidently.report import Report
+from evidently.metric_preset import DataDriftPreset, ClassificationPreset
+from evidently import ColumnMapping
+#from evidently.model_monitoring import PrometheusMetricWriter
 import pandas as pd
 from sklearn.metrics import f1_score
 import threading
+import json
+import traceback
+import warnings
+from sklearn.exceptions import UndefinedMetricWarning
 
 from fastapi import FastAPI, Depends, HTTPException, status, Header, Request, Response
 from pydantic import BaseModel
@@ -24,6 +32,7 @@ from collections import defaultdict
 from dotenv import load_dotenv
 import subprocess
 
+warnings.filterwarnings('ignore', category=UndefinedMetricWarning)
 load_dotenv()
 # --------------------------------
 # PROMETHEUS implementation
@@ -48,6 +57,40 @@ PREDICTION_LATENCY = Histogram(
     'Latency of prediction requests in seconds',
     ['method', 'endpoint']
 )
+
+# Data drift monitoring
+DATA_DRIFT_DETECTED = Gauge(
+    'data_drift_detected',
+    'Indicates if data drift was detected (1 if detected, 0 otherwise)'
+)
+
+DATA_DRIFT_SCORE = Gauge(
+    'data_drift_score',
+    'Overall data drift score'
+)
+
+# Predictin drift monitoring
+PREDICTION_DRIFT_DETECTED = Gauge(
+    'prediction_drift_detected',
+    'Indicates if prediction drift was detected (1 if detected, 0 otherwise)'
+)
+
+PREDICTION_DRIFT_SCORE = Gauge(
+    'prediction_drift_score',
+    'Jensen-Shannon drift score for the predicted_code column'
+)
+
+# Model performance monitoring
+MODEL_PERFORMANCE_F1_SCORE_CURRENT = Gauge(
+    'model_performance_f1_score_current',
+    'F1 score of the current model on recent feedback data with ground truth'
+)
+
+MODEL_PERFORMANCE_PRECISION_CURRENT = Gauge(
+    'model_performance_precision_current',
+    'Precision of the current model on recent feedback data with ground truth'
+)
+
 
 def calculate_and_expose_f1():
     while True:
@@ -79,7 +122,9 @@ def calculate_and_expose_f1():
                 predicted_labels = df_filtered['predicted_code'].astype(int)
 
                 if len(true_labels.unique()) == 1 and len(predicted_labels.unique()) == 1 and true_labels.unique()[0] == predicted_labels.unique()[0]:
-                     f1 = f1_score(true_labels, predicted_labels, average='weighted')
+                     f1 = f1_score(true_labels, predicted_labels, average='weighted', zero_division=0)
+                     PREDICTION_F1_SCORE.set(0)
+                     print(f"Calculated F1 Score: {f1}")
                 elif len(true_labels.unique()) < 2 or len(predicted_labels.unique()) < 2:
                     print("Filtered feedback data contains less than two unique classes. F1 score might be misleading or invalid. Setting F1 to 0.")
                     PREDICTION_F1_SCORE.set(0)
@@ -93,29 +138,141 @@ def calculate_and_expose_f1():
             PREDICTION_F1_SCORE.set(0)
         except Exception as e:
             print(f"Error calculating F1 score: {e}")
-            print("Full traceback:", traceback.format_exc()) 
+            print(f"Full traceback: {traceback.format_exc()}") 
             PREDICTION_F1_SCORE.set(0)
         time.sleep(300)
 
+def calculate_and_expose_drift():
+    
+    try:
+        if not os.path.exists(REFERENCE_DF_PATH):
+            print(f"[ERROR] Reference data not found at {REFERENCE_DF_PATH}. Drift monitoring will not function.")
+            reference_df = None 
+        else:
+            reference_df = pd.read_csv(REFERENCE_DF_PATH)
+            print(f"[INFO] Loaded reference data for Evidently from {REFERENCE_DF_PATH}.")
+    except Exception as e:
+        print(f"[ERROR] Failed to load reference data for Evidently: {e}")
+        reference_df = None
 
-#def calculate_and_expose_f1():
-#    while True:
-#        try:
-#            df = pd.read_csv(FEEDBACK_CSV_PATH)
-#            if not df.empty and 'correct_code' in df.columns and 'predicted_code' in df.columns:
-#                f1 = f1_score(df['correct_code'], df['predicted_code'], average='weighted') 
-#                PREDICTION_F1_SCORE.set(f1)
-#                print(f"Calculated F1 Score: {f1}")
-#            else:
-#                print("Feedback file is empty or missing required columns.")
-#                PREDICTION_F1_SCORE.set(0) 
-#        except FileNotFoundError:
-#            print(f"Feedback file not found at {FEEDBACK_CSV_PATH}. F1 score not available.")
-#            PREDICTION_F1_SCORE.set(0) 
-#        except Exception as e:
-#            print(f"Error calculating F1 score: {e}")
-#            PREDICTION_F1_SCORE.set(0) 
-#        time.sleep(300) 
+    while True:
+        try:
+            if reference_df is None:
+                print("Skipping drift calculation: Reference data not loaded.")
+                DATA_DRIFT_DETECTED.set(0) 
+                DATA_DRIFT_SCORE.set(0)
+                PREDICTION_DRIFT_DETECTED.set(0)
+                PREDICTION_DRIFT_SCORE.set(0)
+                MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+                MODEL_PERFORMANCE_PRECISION_CURRENT.set(0)
+                time.sleep(300)
+                continue
+
+            if not os.path.exists(FEEDBACK_CSV_PATH):
+                print(f"Feedback file not found at {FEEDBACK_CSV_PATH}. Skipping drift calculation.")
+                DATA_DRIFT_DETECTED.set(0) 
+                DATA_DRIFT_SCORE.set(0)
+                PREDICTION_DRIFT_DETECTED.set(0)
+                PREDICTION_DRIFT_SCORE.set(0)
+                MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+                MODEL_PERFORMANCE_PRECISION_CURRENT.set(0)
+                time.sleep(300)
+                continue
+
+            feedback_df = pd.read_csv(FEEDBACK_CSV_PATH)
+            current_df = feedback_df[["designation", "description", "correct_code", "predicted_code"]]
+
+            required_cols_for_performance = ['predicted_code', 'correct_code']
+            current_df_for_performance = current_df.dropna(subset=required_cols_for_performance)
+            if current_df_for_performance.empty:
+                print("No valid data with ground truth for performance metrics. Setting performance F1 to 0.")
+                MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+            else:
+                current_df_for_performance['correct_code'] = pd.to_numeric(current_df_for_performance['correct_code'], errors='coerce').astype(int)
+                current_df_for_performance['predicted_code'] = pd.to_numeric(current_df_for_performance['predicted_code'], errors='coerce').astype(int)
+                current_df_for_performance.dropna(subset=['correct_code', 'predicted_code'], inplace=True) 
+                reference_df = reference_df.rename(columns={"prdtypecode": "correct_code", "y_pred": "predicted_code"})
+                reference_df = reference_df[["designation", "description", "correct_code", "predicted_code"]]
+                reference_df.dropna(subset=['correct_code', 'predicted_code'], inplace=True) 
+                reference_df['correct_code'] = pd.to_numeric(reference_df['correct_code'], errors='coerce').astype(int)
+
+
+            
+            reference_df_for_evidently = reference_df.copy()
+            current_df_for_evidently = current_df_for_performance.copy()
+            product_dictionary = pd.read_pickle(product_dictionary_path)
+            sorted_target_names = [product_dictionary[k] for k in sorted(product_dictionary.keys())]
+            
+            column_mapping = ColumnMapping(
+                target="correct_code",
+                prediction="predicted_code",
+                text_features=["designation", "description"],
+                task="classification"
+            )
+            column_mapping_data_drift = ColumnMapping(
+                target=None,
+                prediction="predicted_code",
+                text_features=["designation", "description"],
+                task="classification"
+            )
+            
+            data_drift_report = Report(metrics=[DataDriftPreset()])
+            model_performance_report = Report(metrics=[ClassificationPreset()])
+
+            #report = Report(metrics=[DataDriftPreset(), ClassificationPreset()], include_tests=True)
+            
+            model_performance_report.run(reference_data=reference_df_for_evidently, 
+                       current_data=current_df_for_evidently,
+                       column_mapping=column_mapping)
+            data_drift_report.run(reference_data=reference_df_for_evidently, 
+                       current_data=current_df_for_evidently,
+                       column_mapping=column_mapping_data_drift)
+
+
+            # --- Extract metrics and send to Prometheus ---
+
+            #print(json.dumps(data_drift_report.as_dict(), indent=2)) # for debugging
+
+            # Data Drift
+            overall_drift = data_drift_report.as_dict()['metrics'][0]['result']['dataset_drift']
+            drift_table = data_drift_report.as_dict()['metrics'][1]['result']['drift_by_columns']
+            
+            print(f"Data Drift Detected: {overall_drift}")
+            for col_name, col_info in drift_table.items():
+                print(
+                    f"{col_name}: Drift detected? {col_info['drift_detected']} "
+                    f"(score={col_info['drift_score']:.3f})"
+                )
+
+            DATA_DRIFT_DETECTED.set(1 if overall_drift else 0)
+            DATA_DRIFT_SCORE.set(data_drift_report.as_dict()['metrics'][0]['result']['drift_share'])
+                                 
+            prediction_drift_score = drift_table['predicted_code']['drift_score']
+            PREDICTION_DRIFT_SCORE.set(prediction_drift_score)
+            PREDICTION_DRIFT_DETECTED.set(1 if drift_table['predicted_code']['drift_detected'] else 0)              
+            print(f"prediction drift score: {prediction_drift_score}")
+            
+            
+            #print(json.dumps(model_performance_report.as_dict(), indent=2))
+            overall_performance = model_performance_report.as_dict()['metrics'][0]['result']['current']
+            f1 = overall_performance['f1']
+            precision = overall_performance['precision']
+            print(f"F1: {f1:.3f}, Precision: {precision:.3f}")
+
+            MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(f1)
+            MODEL_PERFORMANCE_PRECISION_CURRENT.set(precision)
+
+
+        except Exception as e:
+            print(f"[ERROR] Error calculating drift with Evidently: {e}")
+            DATA_DRIFT_DETECTED.set(0)
+            PREDICTION_DRIFT_DETECTED.set(0)
+            MODEL_PERFORMANCE_F1_SCORE_CURRENT.set(0)
+            traceback.print_exc() 
+
+        time.sleep(900) 
+
+
 
 # --------------------------------
 # FastAPI App 
@@ -197,6 +354,7 @@ class FeedbackInput(BaseModel):
 def startup():
     global FEEDBACK_CSV_PATH, predictor, prod_model_version
     global model_params, model_metrics, label_to_code, valid_labels, CSV_LOCK_PATH
+    global REFERENCE_DF_PATH, product_dictionary_path
 
     # Load environment variables
     feedback_dir = os.getenv("DATA_FEEDBACK_DIR")
@@ -246,6 +404,11 @@ def startup():
         # vectorizer_path = "/app/models/tfidf_vectorizer.pkl"
         print(f"[INFO] Using remote vectorizer: {vectorizer_path}")
 
+        print(f"[INFO] Downloading reference data for evidently")
+        reference_df_dir = client.download_artifacts(run_id=run_id, path="monitoring_data")
+        REFERENCE_DF_PATH = os.path.join(reference_df_dir, "reference_df_evidently.csv")
+        print(f"[INFO] Reference data path: {REFERENCE_DF_PATH}")
+
         print(f"[DEBUG] Downloading product dictionary...")
         product_dict_dir = client.download_artifacts(run_id=run_id, path="product_dictionary")
         product_dictionary_path = os.path.join(product_dict_dir, "product_dictionary.pkl")
@@ -270,7 +433,12 @@ def startup():
         # Start the F1 score calculation thread
         f1_thread = threading.Thread(target=calculate_and_expose_f1, daemon=True)
         f1_thread.start()
-        print("F1 score calculation thread started.")
+        print("[INFO] F1 score calculation thread started.")
+
+        # Start the drift monitoring thread
+        drift_thread = threading.Thread(target=calculate_and_expose_drift, daemon=True)
+        drift_thread.start()
+        print("Drift monitoring thread started.")
 
     except Exception as e:
         print(f"[ERROR] Failed during startup: {e}")
