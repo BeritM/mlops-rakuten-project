@@ -107,8 +107,7 @@ graph LR;
 
 ```text
 mlops-rakuten-project/
-├── docker-compose.yml              # Core micro‑services
-├── docker-compose.monitoring.yml   # Monitoring stack (Prometheus, Grafana …)
+├── docker-compose.yml              # Micro‑services
 ├── dockerfiles/                    # One Dockerfile per micro‑service
 ├── dags/                           # Airflow DAGs
 ├── plugins/                        # Domain logic
@@ -118,7 +117,6 @@ mlops-rakuten-project/
 |                                   #  ├─ inference/
 │                                   #  └─ tests/
 ├── monitoring/                     # Prometheus / Grafana configs
-├── drift_monitor/                  # Scheduled drift detection
 ├── shared_volume/                  # **DVC‑tracked** data & models
 ├── ui_app.py                       # Streamlit front‑end
 ├── READ_ME_FOR_MONITORING.md       # Full monitoring guide
@@ -126,7 +124,7 @@ mlops-rakuten-project/
 └── README.md                       # (this file)
 ```
 
-> **Note:** All persistent artefacts (data, models, vectoriser, feedback CSV …) live under `shared_volume/` and are version‑controlled with **DVC**.
+> **Note:** All persistent artefacts (data, models, vectorizer, feedback CSV …) live under `shared_volume/` or in MLflow artifacts and are version‑controlled with **DVC**.
 
 ---
 
@@ -186,17 +184,17 @@ streamlit run ui_app.py
 ### Model Training
 
 * **Algorithm** `SGDClassifier` (logistic loss) with custom class weights.
-* **Experiment Tracking** All params, metrics & artefacts logged to **MLflow**; model registered under alias `production`.
+* **Experiment Tracking** All params, metrics & artefacts logged to **MLflow**; model registered in `experiments`.
 
 ### Validation & Auto‑Promotion
 
-* Validation container compares new F1‑score against the currently deployed model and, if improved, *promotes* the run via MLflow aliasing.
+* Validation container compares new F1‑score against the currently deployed model and, if improved, *promotes* the run via MLflow aliasing (alias `production`).
 
 ### Deployment
 
 * **Auth Service** – FastAPI app that implements OAuth2 login against an in-memory user store, issues and verifies HS256 JWTs (with a 30 min expiry), enforces role-based (admin) CRUD on `/users`, and exposes `/health` plus a Prometheus-compatible `/metrics` endpoint 
-* **Predict Service** – FastAPI app that verifies HS256 JWTs, loads the TF-IDF vectorizer and SGD model from MLflow on startup, exposes `/predict` (logging each request’s output to a CSV with file-locking and asynchronous DVC/Git pushes), `/feedback` (updating that CSV and triggering pushes), `/model-info`, `/health`, and Prometheus-compatible `/metrics` endpoints, and continuously computes an F1-score gauge plus request-count and latency metrics via background threads and middleware.
-* **UI** – Streamlit dashboard for manual predictions & feedback collection.
+* **Predict Service** – FastAPI app that verifies HS256 JWTs, loads the TF-IDF vectorizer and SGD model from MLflow on startup, exposes `/predict` (logging each request’s output to a CSV with file-locking and asynchronous DVC/Git pushes), `/feedback` (updating that CSV and triggering pushes), `/model-info`, `/health`, and Prometheus-compatible `/metrics` endpoints, and continuously computes an F1-score gauge plus request-count and latency metrics as well as evidently drift metrics via background threads and middleware.
+* **UI** – Streamlit dashboard for manual predictions & feedback collection (user) and additionally user management, delivering production model info and manual trigger for retraining (admin).
 
 ---
 
@@ -293,8 +291,12 @@ streamlit run ui_app.py --server.port 8501
 * **Data persistence** – move raw & feedback tables to PostgreSQL, store large artefacts (models, vectoriser, metrics) in object storage (S3/GCS) for cheaper, scalable retention.
 * **Auto‑scaling deployment** – containerise inference stack on Kubernetes (e.g. K3s or EKS) with Horizontal Pod Autoscaler.
 * **Feature Store** – introduce Feast to guarantee online/offline feature parity.
-* **Continuous drift detection** – hook Evidently alerts into Prometheus → Grafana; trigger auto‑retraining DAG on drift.
+* **Continuous performance control** – hook Evidently alerts into Prometheus → Grafana; trigger auto‑retraining DAG on drift.
+* **Rate-limiting and alerts** - detect unusually high request volumes (potential DDoS) and optionally disable or throttle the service if thresholds are exceeded.
+* **Dashboard enhancement** - additional metrics such as resource utilization, auth attempts, ... to get more information and enhance systems and models.
 * **Security hardening** – container image scanning (Trivy) & Dependabot for vuln alerts.
+* **Scalability** - deploy in containers (e.g. Kubernetes), scale inference horizontally, use load balancers for automatic traffic distribution.
+* **Image recognition models** - enable multimodal inference and enrich the system’s predictive capabilities.
 
 ---
 
