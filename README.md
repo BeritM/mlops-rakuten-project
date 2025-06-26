@@ -80,7 +80,7 @@ graph LR;
     EV[Model Monitoring<br>Evidently AI]
     PR[Performance Metrics<br>Prometheus]
     GF[Dashboards<br>Grafana]
-    ALERT[Performace Alerts]<br>Alert Manager
+    ALERT[Performance Alerts<br>Alert Manager]
   end
 
   %% Control & Data Flows
