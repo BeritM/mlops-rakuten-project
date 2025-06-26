@@ -1,7 +1,6 @@
 volumes:
   shared-volume: {}
   dvc-cache-volume: {}
-  #postgres-db-volume: {}
   grafana_data: {}
   prometheus_data: {}
 
@@ -11,15 +10,22 @@ services:
       context: "."
       dockerfile: "./dockerfiles/dvc/Dockerfile"
     volumes:
-      #- ./.git:/app/.git:ro  # Git repository explizit mounten (read-only)
-      - dvc-cache-volume:/app/.dvc/_cache # Named Volume
-      - shared-volume:/app/shared-volume # Named volume
+      - dvc-cache-volume:/app/.dvc/_cache
+      - shared-volume:/app/shared-volume
     working_dir: /app
     environment:
       - DAGSHUB_USER_TOKEN=${DAGSHUB_USER_TOKEN}
       - DAGSHUB_REPO_OWNER=${DAGSHUB_REPO_OWNER}
       - DAGSHUB_REPO_NAME=${DAGSHUB_REPO_NAME}
-    command: ["dvc", "pull", "shared_volume/data/raw", "shared_volume/data/processed", "shared_volume/data/feedback", "shared_volume/models", "--force"]
+    command:
+      [
+        "dvc", "pull",
+        "shared_volume/data/raw",
+        "shared_volume/data/processed",
+        "shared_volume/data/feedback",
+        "shared_volume/models",
+        "--force"
+      ]
 
   auth_service:
     build:
@@ -29,7 +35,13 @@ services:
       - .env
     ports:
       - "8001:8001"
-    command: ["uvicorn", "plugins.cd4ml.inference.auth_service:auth_app", "--host", "0.0.0.0", "--port", "8001"]
+    command:
+      [
+        "uvicorn",
+        "plugins.cd4ml.inference.auth_service:auth_app",
+        "--host", "0.0.0.0",
+        "--port", "8001"
+      ]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8001/health"]
       interval: 30s
@@ -57,43 +69,24 @@ services:
         condition: service_healthy
       dvc-sync:
         condition: service_completed_successfully
-    command: ["uvicorn", "plugins.cd4ml.inference.predict_service:predict_app", "--host", "0.0.0.0", "--port", "8002"]
+    command:
+      [
+        "uvicorn",
+        "plugins.cd4ml.inference.predict_service:predict_app",
+        "--host", "0.0.0.0",
+        "--port", "8002"
+      ]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8002/health"]
       interval: 30s
       timeout: 5s
       retries: 5
-  
-  #drift-monitor:
-  #  build:
-  #    context: .
-  #    dockerfile: dockerfiles/monitoring/Dockerfile
-  #  env_file:
-  #    - ./.env
-  #  volumes:
-  #    - ./shared_volume:/app/shared_volume  
-  #    - dvc-cache:/app/.dvc/cache           
-  #  environment:
-  #    PREDICT_URL: http://predict_service:8002/predict
-  #    VALIDATION_DATA: /app/shared_volume/data/validation/labels.npy
-  #    PUSHGATEWAY_URL: http://pushgateway:9091
-  #    BATCH_SIZE: '100'
-  #    INTERVAL_SEC: '300'
-  #  depends_on:
-  #    pushgateway:
-  #      condition: service_started
-  #    dvc-sync:
-  #      condition: service_completed_successfully
-  #  networks:
-  #    - drift-net
 
-  #pushgateway:
-  #  image: prom/pushgateway:latest
-  #  container_name: pushgateway_service
-  #  ports:
-  #    - '9091:9091'
-  #  networks:
-  #    - drift-net
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox_exporter
+    ports:
+      - "9115:9115"
 
   prometheus:
     image: prom/prometheus:latest
@@ -102,32 +95,31 @@ services:
       - ./monitoring/prometheus/:/etc/prometheus/:ro
       - prometheus_data:/prometheus
     ports:
-      - '9090:9090'
+      - "9090:9090"
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
     depends_on:
       - auth_service
       - predict_service
+      - blackbox-exporter
 
-  #alertmanager:
-  #  image: prom/alertmanager:v0.24.0
-  #  container_name: alertmanager_service
-  #  volumes:
-  #    - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-  #  command:
-  #    - '--config.file=/etc/alertmanager/alertmanager.yml'
-  #  ports:
-  #    - '9093:9093'
-  #  depends_on:
-  #    - prometheus
-    #networks:
-    #  - drift-net
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager_service
+    volumes:
+      - ./monitoring/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    ports:
+      - "9093:9093"
+    depends_on:
+      - prometheus
 
   grafana:
     image: grafana/grafana:latest
     container_name: grafana_service
     ports:
-      - '3000:3000'
+      - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana/provisioning/:/etc/grafana/provisioning/
@@ -138,10 +130,31 @@ services:
       GF_LOG_LEVEL: debug
     depends_on:
       - prometheus
-    #  - alertmanager
-    #networks:
-    #  - drift-net
+      - alertmanager
 
-#networks:
-#  drift-net:
-#    driver: bridge
+# Save it for drift monitoring or Pushgateway:
+#
+#  drift-monitor:
+#    build:
+#      context: .
+#      dockerfile: dockerfiles/monitoring/Dockerfile
+#    env_file:
+#      - ./.env
+#    volumes:
+#      - ./shared_volume:/app/shared_volume
+#      - dvc-cache-volume:/app/.dvc/_cache
+#    environment:
+#      PREDICT_URL: http://predict_service:8002/predict
+#      VALIDATION_DATA: /app/shared_volume/data/validation/labels.npy
+#      PUSHGATEWAY_URL: http://pushgateway:9091
+#      BATCH_SIZE: '100'
+#      INTERVAL_SEC: '300'
+#    depends_on:
+#      - pushgateway
+#      - dvc-sync
+#
+#  pushgateway:
+#    image: prom/pushgateway:latest
+#    container_name: pushgateway_service
+#    ports:
+#      - "9091:9091"

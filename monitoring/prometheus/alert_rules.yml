@@ -1,14 +1,11 @@
 groups:
-  - name: prediction-service-alerts
-    folder: ML-Service-Alerts 
+  - name: model_performance
     rules:
-      - alert: F1_Score_Too_Low_Prediction_Service
-        expr: prediction_f1_score < (0.73*0.9)
+      - alert: ModelF1Drop
+        expr: prediction_f1_score < 0.5 * prediction_f1_score offset 1h
         for: 5m
         labels:
-          severity: warning
-          service: predict_service
-          threshold_value: "0.657"
+          severity: critical
         annotations:
-          summary: "F1-Score of Prediction Service is below threshold"
-          description: "F1-Score of Prediction Service is {{ $value }}. That is below the configured threshold of {{ .Labels.threshold_value }}."
+          summary: "F1 score dropped by >10%"
+          description: "Current F1 score is {{ $value }} and has fallen by more than 10% compared to an hour ago."
