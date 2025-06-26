@@ -28,7 +28,7 @@ A production‑grade, **end‑to‑end MLOps pipeline** for automatic product‑
 ## High‑Level Architecture
 
 ```mermaid
-flowchart LR
+graph LR;
   %% Environment setup
   subgraph "Environment setup"
     direction LR
