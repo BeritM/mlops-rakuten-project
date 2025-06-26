@@ -276,7 +276,7 @@ services:
 
     # === MONITORING SERVICES ===
 
-    blackbox-exporter:
+  blackbox-exporter:
     image: prom/blackbox-exporter:latest
     container_name: blackbox_exporter
     ports:
