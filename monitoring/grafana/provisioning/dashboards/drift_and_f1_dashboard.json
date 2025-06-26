@@ -28,7 +28,9 @@
       "type": "timeseries",
       "fieldConfig": {
         "defaults": {
-          "unit": "none"
+          "unit": "none",
+          "min": 0,
+          "max": 1
         }
       },
       "targets": [
@@ -44,31 +46,7 @@
         "y": 0
       }
     },
-    {
-      "title": "Model Performance (F1, Precision)",
-      "type": "timeseries",
-      "fieldConfig": {
-        "defaults": {
-          "unit": "none"
-        }
-      },
-      "targets": [
-        {
-          "expr": "model_performance_f1_score_current",
-          "legendFormat": "F1 Score"
-        },
-        {
-          "expr": "model_performance_precision_current",
-          "legendFormat": "Precision"
-        }
-      ],
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      }
-    },
+ 
     {
       "title": "Data Drift Detected (0/1)",
       "type": "stat",
