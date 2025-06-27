@@ -21,7 +21,7 @@ A production‑grade, **end‑to‑end MLOps pipeline** for automatic product‑
 11. [Contributing](#contributing)
 12. [License](#license)
 
-*For detailed instructions on the monitoring and drift‑detection components, see* [READ\_ME\_FOR\_MONITORING.md](READ_ME_FOR_MONITORING.md) *and* [README\_drift.md](README_drift.md).
+*For detailed instructions on the monitoring components, see* [READ\_ME\_FOR\_MONITORING.md](READ_ME_FOR_MONITORING.md).
 
 ---
 
@@ -121,7 +121,6 @@ mlops-rakuten-project/
 ├── shared_volume/                  # **DVC‑tracked** data & models
 ├── ui_app.py                       # Streamlit front‑end
 ├── READ_ME_FOR_MONITORING.md       # Full monitoring guide
-├── README_drift.md                 # Drift module guide
 └── README.md                       # (this file)
 ```
 
@@ -134,7 +133,6 @@ mlops-rakuten-project/
 ### 1 – Prerequisites
 
 * **Docker ≥ 23** – Runtime engine for all containerised services.
-* \`\`\*\* CLI\*\* – Starts the entire stack in one shot.
 * **Git** – Required to clone / fork *this* repository; present inside the containers for internal commits.
 * **DVC** – Already included into the Docker images for pipeline steps. Install *locally* only if you need to run `dvc pull/push` outside the containers (see [`READ_ME_FOR_DVC.md`](READ_ME_FOR_DVC.md)).
 
@@ -155,6 +153,7 @@ docker compose up --build
 # ⇒  http://localhost:8002  Prediction API
 # ⇒  http://localhost:8080  Airflow
 ```
+Artifacts and metrics will be pushed automatically to GitHub / Dagshub.
 
 ### 4 – (Optionally) start the monitoring stack
 
@@ -164,8 +163,6 @@ docker compose -f docker-compose.monitoring.yml up --build -d
 # ⇒  http://localhost:9093  Alertmanager
 # ⇒  http://localhost:3000  Grafana
 ```
-
-Artifacts and metrics will be pushed automatically to GitHub / Dagshub.
 
 ### 5 – Launch the Streamlit demo
 
@@ -179,7 +176,7 @@ streamlit run ui_app.py
 
 ### Data Management
 
-* **Ingestion & Pre‑processing** `plugins/cd4ml/data_processing/run_preprocessing.py` Ingests original training data set and human feedback provided through the prediction service, cleans multilingual text, splits sets, computes TF‑IDF, stores artefacts to DVC.
+* **Ingestion & Pre‑processing** `plugins/cd4ml/data_processing/run_preprocessing.py` Ingests original training data set and human feedback provided through the prediction service, cleans multilingual text, splits sets, computes TF‑IDF, stores artifacts to DVC.
 * **Versioning** Full lineage of raw/processed data, models and feedback stored on a Dagshub‑backed **S3 bucket**.
 
 ### Model Training
@@ -268,12 +265,12 @@ A green check‑mark in GitHub shows the pipeline passed.
 
 | Service        | URL                     | Notes                                                         |
 | -------------- | ----------------------- | ------------------------------------------------------------- |
-| Airflow Web UI | `http://localhost:8080` | DAG management                                                |
 | Auth API       | `http://localhost:8001` | `/login`, `/users`, `/health`, `/metrics`                     |
 | Predict API    | `http://localhost:8002` | `/predict`, `/model-info`, `/feedback`, `/health`, `/metrics` |
+| Airflow Web UI | `http://localhost:8080` | DAG management                                                |
 | Prometheus\*   | `http://localhost:9090` | Metrics explorer                                              |
 | Alertmanager\* | `http://localhost:9093` | Alert routing                                                 |
-| Grafana\*      | `http://localhost:3000` | Dashboards (admin/admin123)                                   |
+| Grafana\*      | `http://localhost:3000` | Dashboards                                 |
 
 *Endpoints marked with an asterisk are available only when the monitoring stack is running (**`docker-compose.monitoring.yml`**).*
 
@@ -296,7 +293,6 @@ streamlit run ui_app.py --server.port 8501
 * **Rate-limiting and alerts** - detect unusually high request volumes (potential DDoS) and optionally disable or throttle the service if thresholds are exceeded.
 * **Dashboard enhancement** - additional metrics such as resource utilization, auth attempts, ... to get more information and enhance systems and models.
 * **Security hardening** – container image scanning (Trivy) & Dependabot for vuln alerts.
-* **Scalability** - deploy in containers (e.g. Kubernetes), scale inference horizontally, use load balancers for automatic traffic distribution.
 * **Image recognition models** - enable multimodal inference and enrich the system’s predictive capabilities.
 
 ---
