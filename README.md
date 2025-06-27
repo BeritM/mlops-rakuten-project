@@ -86,10 +86,11 @@ graph LR;
   %% Control & Data Flows
   RAW & FB --> PRE --> CONS --> TRN --> VAL
 
-  TRN --> ML --> REG
+  TRN --> ML --> REG & MODEL_ART
   VAL --> ML
 
-  REG --> MODEL_ART --> API
+  REG & MODEL_ART--> API
+  MODEL_ART --> EV
   AUTH --> API
 
   API --> FB
