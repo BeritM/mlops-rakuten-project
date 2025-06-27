@@ -97,8 +97,8 @@ graph LR;
   MODEL_ART --> EV
   AUTH --> API
 
-  UI --> AUTH
   UI --> API
+  UI --> AUTH
 
   Users((End Users)) --> UI
 
