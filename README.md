@@ -272,7 +272,7 @@ A green check‑mark in GitHub shows the pipeline passed.
 | Predict API    | `http://localhost:8002` | `/predict`, `/model-info`, `/feedback`, `/health`, `/metrics` |
 | Prometheus\*   | `http://localhost:9090` | Metrics explorer                                              |
 | Alertmanager\* | `http://localhost:9093` | Alert routing                                                 |
-| Grafana\*      | `http://localhost:3000` | Dashboards (admin/admin123)                                   |
+| Grafana\*      | `http://localhost:3000` | Dashboards                                 |
 
 *Endpoints marked with an asterisk are available only when the monitoring stack is running (**`docker-compose.monitoring.yml`**).*
 
