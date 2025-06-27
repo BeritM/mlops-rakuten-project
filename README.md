@@ -65,14 +65,15 @@ graph LR;
     direction LR
     ML[Model Tracking<br>MLflow]
     REG[Model Registry<br>MLflow]
+    MODEL_ART[Model Artifacts<br>MLflow]
   end
+
 
   %% Deployment & Security
   subgraph "Deployment & Security"
     direction LR
     UI["User Interface<br>Streamlit App"]
     AUTH[Authentication Service<br>FastAPI]
-    MODEL_ART[/Model Artifact/]
     API[Prediction Service<br>FastAPI]
   end
 
@@ -82,16 +83,19 @@ graph LR;
     EV[Model Monitoring<br>Evidently AI]
     PR[Performance Metrics<br>Prometheus]
     GF[Dashboards<br>Grafana]
+    ALERT[Performance Alerts<br>Alert Manager]
   end
+
 
   %% Control & Data Flows
   RAW & FB --> PRE --> CONS --> TRN --> VAL
 
-  TRN --> ML --> REG
+  TRN --> ML --> MODEL_ART & REG
   VAL --> ML
 
-  REG --> MODEL_ART --> API
-  API --- AUTH
+  MODEL_ART & REG--> API
+  MODEL_ART --> EV
+  AUTH --> API
 
   UI --> AUTH
   UI --> API
@@ -99,8 +103,10 @@ graph LR;
   Users((End Users)) --> UI
 
   API --> FB
-  API --> EV
-  API --> PR --> GF
+  API --> EV --> PR 
+  API --> PR 
+  AUTH --> PR 
+  PR --> GF & ALERT
 ```
 
 *The diagram shows the complete lifecycle from raw data ingestion through to monitored deployment in production.*
