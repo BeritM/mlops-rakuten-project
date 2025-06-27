@@ -195,8 +195,9 @@ streamlit run ui_app.py
 
 * **Auth Service** – FastAPI app that implements OAuth2 login against an in-memory user store, issues and verifies HS256 JWTs (with a 30 min expiry), enforces role-based (admin) CRUD on `/users`, and exposes `/health` plus a Prometheus-compatible `/metrics` endpoint 
 * **Predict Service** – FastAPI app that verifies HS256 JWTs, loads the TF-IDF vectorizer and SGD model from MLflow on startup, exposes `/predict` (logging each request’s output to a CSV with file-locking and asynchronous DVC/Git pushes), `/feedback` (updating that CSV and triggering pushes), `/model-info`, `/health`, and Prometheus-compatible `/metrics` endpoints, and continuously computes an F1-score gauge plus request-count and latency metrics as well as evidently drift metrics via background threads and middleware.
-* **UI** – Streamlit dashboard for manual predictions & feedback collection (user) and additionally user management, delivering production model info and manual trigger for retraining (admin).
-
+**UI** – A Streamlit app that provides a graphical interface for end users to interact with the Authentication and Prediction services.  
+- **User role**: Get a product category prediction for a product (name & description)  & confirm the correctness of prediction
+- **Admin role**: Manage users, view production-model details, and manually trigger model retraining.  
 ---
 
 ## Versioning & Experiment Tracking
