@@ -86,7 +86,7 @@ graph LR;
   %% Control & Data Flows
   RAW & FB --> PRE --> CONS --> TRN --> VAL
 
-  TRN --> ML --> REG & MODEL_ART
+  TRN --> ML --> MODEL_ART & REG
   VAL --> ML
 
   REG & MODEL_ART--> API
