@@ -89,7 +89,7 @@ graph LR;
   TRN --> ML --> MODEL_ART & REG
   VAL --> ML
 
-  REG & MODEL_ART--> API
+  MODEL_ART & REG--> API
   MODEL_ART --> EV
   AUTH --> API
 
