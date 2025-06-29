@@ -1,16 +1,10 @@
 import re
-import nltk
 import pandas as pd
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 
-# Download required resources once
-#nltk.download('punkt')
-#nltk.download('stopwords')
-#nltk.download('wordnet')
 
-# Get stopwords for English and French and also custom stopwords
 stop_words_eng = set(stopwords.words('english'))
 stop_words_fr = set(stopwords.words('french'))
 custom_stopwords = set(["chez", "der", "plu", "haut", "peut", "non", "100", "produit", "lot", "tout", "cet", "cest", "sou", "san"])

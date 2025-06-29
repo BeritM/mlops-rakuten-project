@@ -1,4 +1,3 @@
-### --- auth_api.py ---
 from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -33,7 +32,6 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def verify_token(token: str = Depends(oauth2_scheme)):
-# def verify_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
@@ -67,19 +65,8 @@ REQUEST_LATENCY = Histogram(
     ['method', 'endpoint']
 )
 
-# Optional: Counter for failed authentications --> needs additional code in /login
-#FAILED_AUTH_ATTEMPTS = Counter(
-#    'auth_service_failed_auth_attempts_total',
-#    'Total number of failed authentication attempts'
-#)
 
-# Optional: Counter for successful authentications --> needs additional code in /login
-#SUCCESSFUL_AUTH_ATTEMPTS = Counter(
-#    'auth_service_successful_auth_attempts_total',
-#    'Total number of successful authentication attempts'
-#)
-
-# Middleware for collecting metrics for EVERY request
+# Middleware for collecting metrics for every request
 @auth_app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     start_time = time.time()
@@ -144,11 +131,11 @@ def delete_user(username: str, user=Depends(admin_required)):
 def health_check():
     return {"status": "ok"}
 
+
 # ----------------------------------------------------
-# Prometheus Metriken Endpoint
+# Prometheus Metrics Endpoint
 # ----------------------------------------------------
 
 @auth_app.get("/metrics")
 async def metrics():
-    # generate_latest() erzeugt die Prometheus-Textformat-Ausgabe
     return Response(content=generate_latest(), media_type="text/plain; version=0.0.4; charset=utf-8")
