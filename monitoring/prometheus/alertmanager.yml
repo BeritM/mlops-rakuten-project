@@ -14,5 +14,8 @@ receivers:
         send_resolved: false
         http_config:
           basic_auth:
-            username: "admin"
-            password: "admin123"
+            username: _AIRFLOW_WWW_USER_USERNAME
+            password: _AIRFLOW_WWW_USER_PASSWORD
+        # Neccessary if you want to use the Airflow API with basic auth or session auth
+        # json_content:
+        #   conf: {}
