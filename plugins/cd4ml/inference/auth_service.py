@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from typing import Dict
 import time
 from prometheus_client import generate_latest, Counter, Histogram
-from prometheus_client.metrics import MetricWrapperBase
 
 # --- FastAPI Setup ---
 auth_app = FastAPI()

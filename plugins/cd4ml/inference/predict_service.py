@@ -202,8 +202,6 @@ def calculate_and_expose_drift():
             
             reference_df_for_evidently = reference_df.copy()
             current_df_for_evidently = current_df_for_performance.copy()
-            product_dictionary = pd.read_pickle(product_dictionary_path)
-            sorted_target_names = [product_dictionary[k] for k in sorted(product_dictionary.keys())]
             
             column_mapping = ColumnMapping(
                 target="correct_code",

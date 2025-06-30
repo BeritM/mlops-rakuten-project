@@ -37,13 +37,11 @@ All steps are executed in sequence, ensuring that the raw data is processed and 
 import sys
 import os
 import pandas as pd
-from pathlib import Path
 from dvc_push_manager import track_and_push_with_retry
-from step01_combine_xy import load_combined_data
-from step01b_combine_feedback_raw import combine_feedback_raw
-#from step02_text_cleaning import clean_text
-from step03_split_data import split_dataset
-from step04_tfidf_transform import apply_tfidf
+from combine_xy import load_combined_data
+from combine_feedback_raw import combine_feedback_raw
+from split_data import split_dataset
+from tfidf_transform import apply_tfidf
 from preprocessing_core import ProductTypePredictorMLflow # replaces step02_text_cleaning
 
 
