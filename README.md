@@ -219,7 +219,7 @@ The helper script `dvc_push_manager.py` automates *DVC ➜ Git* synchronisatio
 ## Orchestration & Automation
 
 * **Local** – `docker‑compose.yml` wires the individual services and shared volumes.
-* **Batch** – `ml_pipeline_mixed_experiment_dvc.py` Airflow DAG runs every 10 min and orchestrates the four Docker containers with `DockerOperator`.
+* **Batch** – `ml_pipeline_mixed_experiment_dvc.py` Airflow DAG runs weekly and orchestrates the four Docker containers with `DockerOperator`.
 * **CI / Tests** – GitHub Actions build images, execute linters + the PyTest suite located in `plugins/cd4ml/tests`.
 
 ---
