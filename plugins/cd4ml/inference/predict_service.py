@@ -106,7 +106,6 @@ def calculate_and_expose_f1():
             if not all(col in df.columns for col in required_columns):
                 print("Feedback file is missing 'correct_code' or 'predicted_code' columns. Setting F1 to 0.")
                 PREDICTION_F1_SCORE.set(0)
-                time.sleep(300)
                 continue
 
             df['correct_code'] = pd.to_numeric(df['correct_code'], errors='coerce')
@@ -139,7 +138,6 @@ def calculate_and_expose_f1():
             print(f"Error calculating F1 score: {e}")
             print(f"Full traceback: {traceback.format_exc()}") 
             PREDICTION_F1_SCORE.set(0)
-        time.sleep(300)
 
 def calculate_and_expose_drift():
     """
