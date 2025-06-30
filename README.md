@@ -301,7 +301,9 @@ streamlit run ui_app.py --server.port 8501
 * **Rate-limiting and alerts** - detect unusually high request volumes (potential DDoS) and optionally disable or throttle the service if thresholds are exceeded.
 * **Dashboard enhancement** - additional metrics such as resource utilization, auth attempts, ... to get more information and enhance systems and models.
 * **Security hardening** – container image scanning (Trivy) & Dependabot for vuln alerts.
+* **Resource Efficiency Improvements** - optimize container and service configurations to reduce computational load.
 * **Image recognition models** - enable multimodal inference and enrich the system’s predictive capabilities.
+
 
 ---
 
