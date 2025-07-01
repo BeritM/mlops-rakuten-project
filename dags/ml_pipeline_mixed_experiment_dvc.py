@@ -33,7 +33,7 @@ with DAG(
     dag_id='ml_pipeline_mixed_experiment_dvc',
     default_args=default_args,
     description='ML Pipeline: all via DockerOperator',
-    schedule_interval='@weekly',
+    schedule_interval='@monthly',
     start_date=days_ago(1),
     catchup=False,
     max_active_runs=1,
