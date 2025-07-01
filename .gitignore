@@ -8,6 +8,8 @@ shared_volume/data/raw
 shared_volume/data/processed
 shared_volume/data/feedback
 shared_volume/models
+shared-volume/data/raw
+shared-volume/data/feedback
 !shared_volume/data/raw/.gitkeep
 !shared_volume/data/processed/.gitkeep
 !shared_volume/data/feedback/.gitkeep
